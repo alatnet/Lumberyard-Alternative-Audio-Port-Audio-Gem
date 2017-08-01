@@ -1,0 +1,19 @@
+{
+  "none": {
+    "Source": [
+      "Source/StdAfx.cpp",
+      "Source/StdAfx.h"
+    ]
+  },
+  "auto": {
+    "Include": [
+      "Include/PortAudio/PortAudioBus.h"
+    ],
+    "Source": [
+      "Source/PortAudioModule.cpp",
+      "Source/PortAudioSystemComponent.cpp",
+      "Source/PortAudioSystemComponent.h",
+      "Source/PortAudioCommon.h"
+    ]
+  }
+}

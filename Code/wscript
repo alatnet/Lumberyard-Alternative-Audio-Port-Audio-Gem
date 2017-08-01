@@ -1,0 +1,51 @@
+from waflib.TaskGen import feature
+
+@feature('copy_audio_dlls')
+def feature_copy_audio_dlls(self):
+	platform = self.bld.env['PLATFORM']
+	configuration = self.bld.env['CONFIGURATION']
+
+	#for the windows platform
+	if platform == 'win_x64' or platform == 'win_x64_vs2015' or platform == 'win_x64_vs2013':
+		output_folder = self.bld.get_output_folders(platform, configuration)[0]
+
+		#copy libsamplerate
+		sample_source_file = self.bld.CreateRootRelativePath('Gems/PortAudio/3rdParty/libsamplerate/bin/libsamplerate-0.dll')
+		self.create_task('copy_outputs', self.bld.root.make_node(sample_source_file), output_folder.make_node('libsamplerate-0.dll'))
+
+		#depending on the configuration, copy portaudio
+		if configuration == 'debug' or configuration == 'profile':
+			port_source_file = self.bld.CreateRootRelativePath('Gems/PortAudio/3rdParty/portaudio/bin/Debug/portaudio_x64.dll')
+			self.create_task('copy_outputs', self.bld.root.make_node(port_source_file), output_folder.make_node('portaudio_x64.dll'))
+		else:
+			port_source_file = self.bld.CreateRootRelativePath('Gems/PortAudio/3rdParty/portaudio/bin/Release/portaudio_x64.dll')
+			self.create_task('copy_outputs', self.bld.root.make_node(port_source_file), output_folder.make_node('portaudio_x64.dll'))
+
+def build(bld):
+    bld.DefineGem(
+        # Add custom build options here
+		features = [ 'copy_audio_dlls' ],
+
+        includes    = [
+			bld.Path('Code/CryEngine/CryAction'),
+			bld.Path('Gems/PortAudio/3rdParty/libsamplerate/include'),
+			bld.Path('Gems/PortAudio/3rdParty/portaudio/include')
+		],
+
+        lib = [
+			'libsamplerate-0',
+            'portaudio_x64'
+        ],
+              
+        libpath = [
+            bld.Path('Gems/PortAudio/3rdParty/libsamplerate/lib')
+        ],
+                  
+        debug_libpath = [
+            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Debug')
+        ],
+
+        release_libpath = [
+            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Release')
+        ],
+    )

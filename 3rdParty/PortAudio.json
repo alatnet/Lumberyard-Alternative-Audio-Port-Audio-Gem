@@ -1,0 +1,32 @@
+{
+	"name": "PortAudio",
+	"source": "@GEM@/3rdParty",
+	"description": "Port Audio libraries",
+	"includes": [
+		"libsamplerate/include",
+		"portaudio/include"
+	],
+	"defines": [],
+	"lib_required": "True",
+	"platform": {
+		"win_x64_vs2013": {
+			"libpath": [
+				"libsamplerate/lib",
+				"portaudio/lib/Release"
+			],
+			"sharedlibpath": [
+				"libsamplerate/bin",
+				"portaudio/bin/Release"
+			],
+			"lib": [
+				"libsamplerate-0.lib",
+				"portaudio_x64.lib"
+			],
+			"shared": [
+				"libsamplerate-0.dll",
+				"portaudio_x64.dll"
+			]
+		},
+		"win_x64_vs2015": "@win_x64_vs2013"
+	}
+}
