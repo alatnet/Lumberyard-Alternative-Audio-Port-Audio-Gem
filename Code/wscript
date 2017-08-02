@@ -33,8 +33,8 @@ def build(bld):
 		],
 
         lib = [
-			'libsamplerate-0',
-            'portaudio_x64'
+            'portaudio_x64',
+			'libsamplerate-0'
         ],
               
         libpath = [

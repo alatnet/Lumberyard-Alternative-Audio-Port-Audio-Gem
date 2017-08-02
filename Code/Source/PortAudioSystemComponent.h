@@ -14,6 +14,7 @@ namespace PortAudio
     {
 	public:
 		PortAudioSystemComponent();
+		~PortAudioSystemComponent();
     public:
         AZ_COMPONENT(PortAudioSystemComponent, "{1E19EC45-499C-47EE-8FC7-915F6916FF48}");
 
@@ -28,7 +29,11 @@ namespace PortAudio
         ////////////////////////////////////////////////////////////////////////
         // PortAudioRequestBus interface implementation
 	protected: //stream control
-		void SetStream(double samplerate, AZ::Uuid& audioFormat, int device, void * hostApiSpecificStreamInfo);
+		void SetStream(double samplerate, AlternativeAudio::AudioFrame::Type audioFormat, int device, void * hostApiSpecificStreamInfo);
+		void SetResampleQuality(EAudioResampleQuality quality);
+		int GetDefaultDevice() { return Pa_GetDefaultOutputDevice(); }
+		PortAudioDevice GetDefaultDeviceInfo() { return this->devices[Pa_GetDefaultOutputDevice()]; }
+		AZStd::vector<PortAudioDevice> GetDevices() { return this->devices; }
 	protected: //audio source control
 		long long PlaySource(AlternativeAudio::IAudioSource * source, EAudioSection section);
 		void PauseSource(long long id);
@@ -56,7 +61,9 @@ namespace PortAudio
         void Deactivate() override;
         ////////////////////////////////////////////////////////////////////////
 	private:
-		bool m_initialized;
+		static int m_initializeCount;
+		static bool m_initialized;
+		bool m_devicesEnumerated;
 	private:
 		struct PlayingAudioSource {
 			AlternativeAudio::IAudioSource* audioSource{ nullptr };
@@ -85,17 +92,20 @@ namespace PortAudio
 		void pushError(int errorCode, const char * errorStr);
 	private: //audio stream
 		PaStream *m_pAudioStream;
-		AZ::Uuid m_audioFormat;
+		AlternativeAudio::AudioFrame::Type m_audioFormat;
 		int m_device;
 		void * m_hostApiSpecificStreamInfo;
 	private: //samplerate conversion
 		double m_sampleRate;
 		SRC_STATE * m_pSrcState;
+		EAudioResampleQuality m_rsQuality;
 	private: //mutexes
 		AZStd::mutex m_callbackMutex, m_errorMutex;
 	protected:
 		int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData);
 	public:
 		static int paCallbackCommon(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData);
+	public:
+		AZStd::vector<PortAudioDevice> devices;
     };
 }

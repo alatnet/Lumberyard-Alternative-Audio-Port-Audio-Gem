@@ -23,13 +23,38 @@ namespace PortAudio {
 		eAS_Count
 	};
 
+	enum EAudioResampleQuality {
+		eARQ_Best,
+		eARQ_Medium,
+		eARQ_Fastest,
+		eARQ_Zero_Order_Hold,
+		eARQ_Linear
+	};
+
+	struct PortAudioDevice {
+		AZStd::string name;
+		int maxOutputChannels;
+		double lowLatancy;
+		double highLatency;
+		double defaultSampleRate;
+		AZ_RTTI(PortAudioDevice, "{39F2DC01-980A-4B47-9D52-7C22A9DDADDB}");
+
+		AZStd::string GetName() { return this->name; }
+		int GetMaxChannels() { return this->maxOutputChannels; }
+		double GetDefaultSampleRate() { return this->defaultSampleRate; }
+	};
+
 	class PortAudioRequests
 		: public AZ::EBusTraits {
 	public:
 		static const AZ::EBusHandlerPolicy HandlerPolicy = AZ::EBusHandlerPolicy::Single;
 		static const AZ::EBusAddressPolicy AddressPolicy = AZ::EBusAddressPolicy::Single;
 	public: //stream control
-		virtual void SetStream(double samplerate, AZ::Uuid& audioFormat, int device, void * hostApiSpecificStreamInfo) = 0;
+		virtual void SetStream(double samplerate, AlternativeAudio::AudioFrame::Type audioFormat, int device, void * hostApiSpecificStreamInfo) = 0;
+		virtual void SetResampleQuality(EAudioResampleQuality quality) = 0;
+		virtual int GetDefaultDevice() = 0;
+		virtual PortAudioDevice GetDefaultDeviceInfo() = 0;
+		virtual AZStd::vector<PortAudioDevice> GetDevices() = 0;
 	public: //audio source control
 		virtual long long PlaySource(AlternativeAudio::IAudioSource * source, EAudioSection section) = 0;
 		virtual void PauseSource(long long id) = 0;
