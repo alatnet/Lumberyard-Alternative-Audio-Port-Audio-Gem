@@ -25,7 +25,7 @@ namespace PortAudio {
 		m_device = -1;
 		m_hostApiSpecificStreamInfo = 0;
 		m_devicesEnumerated = false;
-		m_rsQuality = eARQ_Medium;
+		m_rsQuality = eARQ_Linear;
 
 		if (PortAudioSystemComponent::m_initializeCount == 0) {
 			PortAudioSystemComponent::m_initializeCount++;
