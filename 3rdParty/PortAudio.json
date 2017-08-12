@@ -9,24 +9,48 @@
 	"defines": [],
 	"lib_required": "True",
 	"platform": {
-		"win_x64_vs2013": {
-			"libpath": [
-				"libsamplerate/lib",
-				"portaudio/lib/Release"
-			],
-			"sharedlibpath": [
-				"libsamplerate/bin",
-				"portaudio/bin/Release"
-			],
-			"lib": [
-				"libsamplerate-0.lib",
-				"portaudio_x64.lib"
-			],
-			"shared": [
-				"libsamplerate-0.dll",
-				"portaudio_x64.dll"
-			]
-		},
+    "win_x64_vs2013": {
+      "libpath_debug": [
+        "libsamplerate/lib",
+        "portaudio/lib/Debug"
+      ],
+      "libpath_profile": [
+        "libsamplerate/lib",
+        "portaudio/lib/Debug"
+      ],
+      "libpath_performance": [
+        "libsamplerate/lib",
+        "portaudio/lib/Release"
+      ],
+      "libpath_release": [
+        "libsamplerate/lib",
+        "portaudio/lib/Release"
+      ],
+      "sharedlibpath_debug": [
+        "libsamplerate/bin",
+        "portaudio/bin/Debug"
+      ],
+      "sharedlibpath_profile": [
+        "libsamplerate/bin",
+        "portaudio/bin/Debug"
+      ],
+      "sharedlibpath_performance": [
+        "libsamplerate/bin",
+        "portaudio/bin/Release"
+      ],
+      "sharedlibpath_release": [
+        "libsamplerate/bin",
+        "portaudio/bin/Release"
+      ],
+      "lib": [
+        "libsamplerate-0.lib",
+        "portaudio_x64.lib"
+      ],
+      "shared": [
+        "libsamplerate-0.dll",
+        "portaudio_x64.dll"
+      ]
+    },
 		"win_x64_vs2015": "@win_x64_vs2013"
 	}
 }

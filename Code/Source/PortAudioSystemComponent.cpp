@@ -14,12 +14,11 @@ namespace PortAudio {
 
 	PortAudioSystemComponent::PortAudioSystemComponent() {
 		m_nextPlayID = 0;
-		m_masterVol = 1.0f;
-		m_vols = AZStd::vector<float>(eAS_Count, 1.0f);
+		//m_masterVol = 1.0f;
+		//m_vols = AZStd::vector<float>(eAS_Count, 1.0f);
 		//for (int i = 0; i < eAS_Count; i++) this->m_vols[i] = 1.0f;
 		m_sampleRate = 44100.0;
 		m_pSrcState = nullptr;
-		m_hasError = false;
 		m_pAudioStream = nullptr;
 		m_audioFormat = AlternativeAudio::AudioFrame::Type::eT_af2;
 		m_device = -1;
@@ -50,7 +49,7 @@ namespace PortAudio {
 			if (err != paNoError) {
 				AZStd::string errString("PA Error: ");
 				errString += Pa_GetErrorText(err);
-				AZ_Printf("[PortAudio]", "[PortAudio] Music Terminate Error: %s\n", errString.c_str());
+				AZ_Printf("[PortAudio]", "[PortAudio] Terminate Error: %s\n", errString.c_str());
 			}
 		}
 	}
@@ -59,8 +58,8 @@ namespace PortAudio {
 		if (AZ::SerializeContext* serialize = azrtti_cast<AZ::SerializeContext*>(context)) {
 			auto classinfo = serialize->Class<PortAudioSystemComponent, AZ::Component>()
 				->Version(1)
-				->Field("masterVol", &PortAudioSystemComponent::m_masterVol)
-				->Field("volumes", &PortAudioSystemComponent::m_vols)
+				//->Field("masterVol", &PortAudioSystemComponent::m_masterVol)
+				//->Field("volumes", &PortAudioSystemComponent::m_vols)
 				->Field("samplerate", &PortAudioSystemComponent::m_sampleRate)
 				->Field("audioFormat", &PortAudioSystemComponent::m_audioFormat)
 				->Field("device", &PortAudioSystemComponent::m_device)
@@ -80,10 +79,10 @@ namespace PortAudio {
 		AZ::BehaviorContext* behaviorContext = azrtti_cast<AZ::BehaviorContext*>(context);
 		if (behaviorContext) {
 			behaviorContext->Class<PortAudioSystemComponent>("PortAudio")
-				->Enum<EAudioSection::eAS_Music>("eAS_Music")
+				/*->Enum<EAudioSection::eAS_Music>("eAS_Music")
 				->Enum<EAudioSection::eAS_SFX>("eAS_SFX")
 				->Enum<EAudioSection::eAS_Voice>("eAS_Voice")
-				->Enum<EAudioSection::eAS_Environment>("eAS_Environment")
+				->Enum<EAudioSection::eAS_Environment>("eAS_Environment")*/
 				->Enum<EAudioResampleQuality::eARQ_Best>("eARQ_Best")
 				->Enum<EAudioResampleQuality::eARQ_Medium>("eARQ_Medium")
 				->Enum<EAudioResampleQuality::eARQ_Fastest>("eARQ_Fastest")
@@ -91,7 +90,7 @@ namespace PortAudio {
 				->Enum<EAudioResampleQuality::eARQ_Linear>("eARQ_Linear")
 				;
 
-			#define EBUS_METHOD(name) ->Event(#name, &PortAudioRequestBus::Events::##name##)
+		#define EBUS_METHOD(name) ->Event(#name, &PortAudioRequestBus::Events::##name##)
 			behaviorContext->EBus<PortAudioRequestBus>("PortAudioBus")
 				EBUS_METHOD(SetStream)
 				EBUS_METHOD(SetResampleQuality)
@@ -102,14 +101,14 @@ namespace PortAudio {
 				EBUS_METHOD(IsPlaying)
 				EBUS_METHOD(GetTime)
 				EBUS_METHOD(SetTime)
-				EBUS_METHOD(SetMasterVol)
+				/*EBUS_METHOD(SetMasterVol)
 				EBUS_METHOD(GetMasterVol)
 				EBUS_METHOD(SetVolume)
 				EBUS_METHOD(GetVolume)
 				EBUS_METHOD(SetSourceVolume)
-				EBUS_METHOD(GetSourceVolume)
+				EBUS_METHOD(GetSourceVolume)*/
 				;
-			#undef EBUS_METHOD
+		#undef EBUS_METHOD
 		}
 	}
 
@@ -369,7 +368,7 @@ namespace PortAudio {
 	}
 
 	//volume control
-	void PortAudioSystemComponent::SetMasterVol(float vol) {
+	/*void PortAudioSystemComponent::SetMasterVol(float vol) {
 		this->m_callbackMutex.lock();
 		if (vol >= 1.0f) vol = 1.0f;
 		if (vol <= 0.0f) vol = 0.0f;
@@ -408,40 +407,7 @@ namespace PortAudio {
 		this->m_callbackMutex.unlock();
 
 		return ret;
-	}
-
-	//error checking
-	bool PortAudioSystemComponent::HasError() {
-		this->m_errorMutex.lock();
-		bool ret = this->m_hasError;
-		this->m_errorMutex.unlock();
-		return ret;
-	}
-	PASError PortAudioSystemComponent::GetError() {
-		if (this->m_errors.size() == 0) {
-			PASError noErr;
-			this->m_hasError = false;
-			return noErr;
-		}
-
-		this->m_errorMutex.lock();
-		PASError ret = this->m_errors.back();
-		this->m_errors.pop_back();
-
-		if (this->m_errors.size() == 0) this->m_hasError = false;
-		this->m_errorMutex.unlock();
-		return ret;
-	}
-
-	void PortAudioSystemComponent::pushError(int errorCode, const char * errorStr) {
-		PASError err;
-		err.code = errorCode;
-		err.str = errorStr;
-		this->m_errorMutex.lock();
-		this->m_errors.push_back(err);
-		this->m_hasError = true;
-		this->m_errorMutex.unlock();
-	}
+	}*/
 
 	int PortAudioSystemComponent::paCallbackCommon(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData) {
 		//redirect to the individual callback. (gives us individualized and possibly multiple streams at the same time).
@@ -449,24 +415,26 @@ namespace PortAudio {
 	}
 
 	AlternativeAudio::AudioFrame::Frame * CreateBuffer(AlternativeAudio::AudioFrame::Type type, long long length) {
-		if (type == AlternativeAudio::AudioFrame::Type::eT_af1)
+		switch (type) {
+		case AlternativeAudio::AudioFrame::Type::eT_af1:
 			return new AlternativeAudio::AudioFrame::af1[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af2)
+		case AlternativeAudio::AudioFrame::Type::eT_af2:
 			return new AlternativeAudio::AudioFrame::af2[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af21)
+		case AlternativeAudio::AudioFrame::Type::eT_af21:
 			return new AlternativeAudio::AudioFrame::af21[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af3)
+		case AlternativeAudio::AudioFrame::Type::eT_af3:
 			return new AlternativeAudio::AudioFrame::af3[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af31)
+		case AlternativeAudio::AudioFrame::Type::eT_af31:
 			return new AlternativeAudio::AudioFrame::af31[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af5)
+		case AlternativeAudio::AudioFrame::Type::eT_af5:
 			return new AlternativeAudio::AudioFrame::af5[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af51)
+		case AlternativeAudio::AudioFrame::Type::eT_af51:
 			return new AlternativeAudio::AudioFrame::af51[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af7)
+		case AlternativeAudio::AudioFrame::Type::eT_af7:
 			return new AlternativeAudio::AudioFrame::af7[length];
-		else if (type == AlternativeAudio::AudioFrame::Type::eT_af71)
+		case AlternativeAudio::AudioFrame::Type::eT_af71:
 			return new AlternativeAudio::AudioFrame::af71[length];
+		}
 		return nullptr;
 	}
 
@@ -514,6 +482,16 @@ namespace PortAudio {
 				frameLength = playingsource->audioSource->GetFrames(framesPerBuffer, (float *)srcframes); //get the data.
 				playingsource->currentFrame += frameLength;
 
+				//apply before convert dsp
+				EBUS_EVENT(
+					AlternativeAudio::AlternativeAudioRequestBus,
+					ProcessDSPEffects,
+					AlternativeAudio::DSPSection::eDS_PerSource_BC,
+					sourceFrameType,
+					(float*)srcframes,
+					framesPerBuffer
+				);
+
 				//convert the audio source's number of channels to port audio's number of channels.
 				EBUS_EVENT(
 					AlternativeAudio::AlternativeAudioRequestBus,
@@ -524,8 +502,17 @@ namespace PortAudio {
 					this->m_audioFormat,
 					frameLength
 				);
-				//convertAudioFrame(srcframes, framesOut, sourceFrameType, this->m_audioFormat, frameLength);
 				delete[] srcframes; //free up the memory.
+
+				//apply after convert dsp
+				EBUS_EVENT(
+					AlternativeAudio::AlternativeAudioRequestBus,
+					ProcessDSPEffects,
+					AlternativeAudio::DSPSection::eDS_PerSource_AC,
+					this->m_audioFormat,
+					(float*)framesOut,
+					framesPerBuffer
+				);
 			} else { //otherwise
 				//read frame data.
 				long long framesToRead = (((long long)((double)framesPerBuffer / ratio)));
@@ -535,6 +522,17 @@ namespace PortAudio {
 				//convert to port audio's channels.
 				AlternativeAudio::AudioFrame::Frame * convertedSrcFrames = CreateBuffer(this->m_audioFormat, framesToRead);
 
+				//apply before convert dsp
+				EBUS_EVENT(
+					AlternativeAudio::AlternativeAudioRequestBus,
+					ProcessDSPEffects,
+					AlternativeAudio::DSPSection::eDS_PerSource_BC,
+					sourceFrameType,
+					(float*)srcframes,
+					framesPerBuffer
+				);
+
+				//convert the audio source's number of channels to port audio's number of channels.
 				EBUS_EVENT(
 					AlternativeAudio::AlternativeAudioRequestBus,
 					ConvertAudioFrame,
@@ -544,8 +542,17 @@ namespace PortAudio {
 					this->m_audioFormat,
 					framesRead
 				);
-				//convertAudioFrame(srcframes, convertedSrcFrames, sourceFrameType, this->m_audioFormat, framesRead);
 				delete[] srcframes;
+
+				//apply after convert dsp
+				EBUS_EVENT(
+					AlternativeAudio::AlternativeAudioRequestBus,
+					ProcessDSPEffects,
+					AlternativeAudio::DSPSection::eDS_PerSource_AC,
+					this->m_audioFormat,
+					(float*)convertedSrcFrames,
+					framesPerBuffer
+				);
 
 				//convert samplerate.
 				SRC_DATA src_data;
@@ -572,96 +579,115 @@ namespace PortAudio {
 				playingsource->currentFrame += src_data.input_frames_used;
 			}
 
-			//adjust volumes
-#			define SET_BUFFERS(type) \
-				AlternativeAudio::AudioFrame::##type##* out = (AlternativeAudio::AudioFrame::##type##*)outputBuffer; \
-				AlternativeAudio::AudioFrame::##type##* src = (AlternativeAudio::AudioFrame::##type##*)framesOut;
+			//apply after resampling dsp
+			EBUS_EVENT(
+				AlternativeAudio::AlternativeAudioRequestBus,
+				ProcessDSPEffects,
+				AlternativeAudio::DSPSection::eDS_PerSource_ARS,
+				this->m_audioFormat,
+				(float*)framesOut,
+				framesPerBuffer
+			);
 
-#			define SET_CHANNEL(channel) \
-				if (out[i].##channel == 0.0f) out[i].##channel = src[i].##channel * (this->m_masterVol * this->m_vols[playingsource->section] * playingsource->vol); \
-				else out[i].##channel += src[i].##channel * (this->m_masterVol * this->m_vols[playingsource->section] * playingsource->vol); \
-				out[i].##channel = AZ::GetClamp(out[i].##channel, -1.0f, 1.0f);
+			//mix audio
+			EBUS_EVENT(
+				AlternativeAudio::AlternativeAudioRequestBus,
+				MixAudioFrames,
+				(float*)outputBuffer,
+				(float*)framesOut,
+				this->m_audioFormat,
+				frameLength
+			);
 
-			if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af1) {
-				SET_BUFFERS(af1);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(mono);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af2) {
-				//SET_BUFFERS(af2);
-				AlternativeAudio::AudioFrame::af2* out = (AlternativeAudio::AudioFrame::af2*)outputBuffer;
-				AlternativeAudio::AudioFrame::af2* src = (AlternativeAudio::AudioFrame::af2*)framesOut;
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af21) {
-				SET_BUFFERS(af21);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(sub);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af3) {
-				SET_BUFFERS(af3);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(center);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af31) {
-				SET_BUFFERS(af31);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(center);
-					SET_CHANNEL(sub);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af5) {
-				SET_BUFFERS(af5);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(center);
-					SET_CHANNEL(bleft);
-					SET_CHANNEL(bright);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af51) {
-				SET_BUFFERS(af51);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(center);
-					SET_CHANNEL(bleft);
-					SET_CHANNEL(bright);
-					SET_CHANNEL(sub);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af7) {
-				SET_BUFFERS(af7);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(center);
-					SET_CHANNEL(sleft);
-					SET_CHANNEL(sright);
-					SET_CHANNEL(bleft);
-					SET_CHANNEL(bright);
-				}
-			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af71) {
-				SET_BUFFERS(af71);
-				for (int i = 0; i < frameLength; i++) {
-					SET_CHANNEL(left);
-					SET_CHANNEL(right);
-					SET_CHANNEL(center);
-					SET_CHANNEL(sleft);
-					SET_CHANNEL(sright);
-					SET_CHANNEL(bleft);
-					SET_CHANNEL(bright);
-					SET_CHANNEL(sub);
-				}
-			}
-#			undef SET_BUFFERS
-#			undef SET_CHANNEL
+//#			define SET_BUFFERS(type) \
+//				AlternativeAudio::AudioFrame::##type##* out = (AlternativeAudio::AudioFrame::##type##*)outputBuffer; \
+//				AlternativeAudio::AudioFrame::##type##* src = (AlternativeAudio::AudioFrame::##type##*)framesOut;
+//
+//#			define SET_CHANNEL(channel) \
+//				if (out[i].##channel == 0.0f) out[i].##channel = src[i].##channel * (this->m_masterVol * this->m_vols[playingsource->section] * playingsource->vol); \
+//				else out[i].##channel += src[i].##channel * (this->m_masterVol * this->m_vols[playingsource->section] * playingsource->vol); \
+//				out[i].##channel = AZ::GetClamp(out[i].##channel, -1.0f, 1.0f);
+//
+//			if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af1) {
+//				SET_BUFFERS(af1);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(mono);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af2) {
+//				//SET_BUFFERS(af2);
+//				AlternativeAudio::AudioFrame::af2* out = (AlternativeAudio::AudioFrame::af2*)outputBuffer;
+//				AlternativeAudio::AudioFrame::af2* src = (AlternativeAudio::AudioFrame::af2*)framesOut;
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af21) {
+//				SET_BUFFERS(af21);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(sub);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af3) {
+//				SET_BUFFERS(af3);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(center);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af31) {
+//				SET_BUFFERS(af31);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(center);
+//					SET_CHANNEL(sub);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af5) {
+//				SET_BUFFERS(af5);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(center);
+//					SET_CHANNEL(bleft);
+//					SET_CHANNEL(bright);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af51) {
+//				SET_BUFFERS(af51);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(center);
+//					SET_CHANNEL(bleft);
+//					SET_CHANNEL(bright);
+//					SET_CHANNEL(sub);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af7) {
+//				SET_BUFFERS(af7);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(center);
+//					SET_CHANNEL(sleft);
+//					SET_CHANNEL(sright);
+//					SET_CHANNEL(bleft);
+//					SET_CHANNEL(bright);
+//				}
+//			} else if (this->m_audioFormat == AlternativeAudio::AudioFrame::Type::eT_af71) {
+//				SET_BUFFERS(af71);
+//				for (int i = 0; i < frameLength; i++) {
+//					SET_CHANNEL(left);
+//					SET_CHANNEL(right);
+//					SET_CHANNEL(center);
+//					SET_CHANNEL(sleft);
+//					SET_CHANNEL(sright);
+//					SET_CHANNEL(bleft);
+//					SET_CHANNEL(bright);
+//					SET_CHANNEL(sub);
+//				}
+//			}
+//#			undef SET_BUFFERS
+//#			undef SET_CHANNEL
 
 			if (playingsource->currentFrame >= playingsource->endFrame) { //if we are finished playing.
 				if (playingsource->loop) { //if we are to loop
@@ -673,6 +699,16 @@ namespace PortAudio {
 		}
 
 		delete[] framesOut; //free up memory
+
+		//Apply Output DSP
+		EBUS_EVENT(
+			AlternativeAudio::AlternativeAudioRequestBus,
+			ProcessDSPEffects,
+			AlternativeAudio::DSPSection::eDS_Output,
+			this->m_audioFormat,
+			(float*)outputBuffer,
+			framesPerBuffer
+		);
 
 		//removed stopped audio files.
 		while (m_stoppedAudioFiles.size() > 0) {

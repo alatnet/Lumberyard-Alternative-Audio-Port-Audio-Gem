@@ -15,6 +15,6 @@
     "Version": "0.1.0",
     "LinkType": "Dynamic",
     "Summary": "Port Audio Gem to add in simple audio system.",
-    "Tags": ["Audio"],
+    "Tags": ["Audio", "Alternative Audio"],
     "IconPath": "preview.png"
 }

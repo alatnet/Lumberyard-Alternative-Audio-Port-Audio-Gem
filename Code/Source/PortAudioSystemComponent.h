@@ -3,6 +3,8 @@
 #include <AzCore/Component/Component.h>
 
 #include <PortAudio/PortAudioBus.h>
+#include <AlternativeAudio/IErrorHandler.h>
+
 
 #include "PortAudioCommon.h"
 
@@ -11,6 +13,7 @@ namespace PortAudio
     class PortAudioSystemComponent
         : public AZ::Component
         , protected PortAudioRequestBus::Handler
+		, public AlternativeAudio::IErrorHandler
     {
 	public:
 		PortAudioSystemComponent();
@@ -42,16 +45,13 @@ namespace PortAudio
 		bool IsPlaying(long long id);
 		AlternativeAudio::AudioSourceTime GetTime(long long id);
 		void SetTime(long long id, double time);
-	protected: //volume control
+	/*protected: //volume control
 		void SetMasterVol(float vol);
 		float GetMasterVol();
 		void SetVolume(float vol, EAudioSection section);
 		float GetVolume(EAudioSection section);
 		void SetSourceVolume(float vol, long long id);
-		float GetSourceVolume(long long id);
-	protected: //error checking
-		bool HasError();
-		PASError GetError();
+		float GetSourceVolume(long long id);*/
         ////////////////////////////////////////////////////////////////////////
 
         ////////////////////////////////////////////////////////////////////////
@@ -83,13 +83,12 @@ namespace PortAudio
 
 		std::vector<long long> m_stoppedAudioFiles;
 	private:
-		float m_masterVol;// , m_musicVol, m_sfxVol;
+		//float m_masterVol;// , m_musicVol, m_sfxVol;
 		//float m_vols[eAS_Count];
-		AZStd::vector<float> m_vols;
-	private: //error checking
-		bool m_hasError;
-		AZStd::vector<PASError> m_errors;
-		void pushError(int errorCode, const char * errorStr);
+		//AZStd::vector<float> m_vols;
+	public:
+		bool HasError() { return AlternativeAudio::IErrorHandler::HasError(); }
+		AlternativeAudio::IError GetError() { return AlternativeAudio::IErrorHandler::GetError(); }
 	private: //audio stream
 		PaStream *m_pAudioStream;
 		AlternativeAudio::AudioFrame::Type m_audioFormat;

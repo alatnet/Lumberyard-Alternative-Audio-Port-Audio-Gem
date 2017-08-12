@@ -44,6 +44,14 @@ def build(bld):
         debug_libpath = [
             bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Debug')
         ],
+                  
+        profile_libpath = [
+            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Debug')
+        ],
+
+        performance_libpath = [
+            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Release')
+        ],
 
         release_libpath = [
             bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Release')

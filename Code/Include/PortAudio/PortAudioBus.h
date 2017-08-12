@@ -4,7 +4,7 @@
 #include <AlternativeAudio\IAudioSource.h>
 
 namespace PortAudio {
-	struct PASError {
+	/*struct PASError {
 		int code;
 		const char * str;
 
@@ -12,7 +12,7 @@ namespace PortAudio {
 			code(0),
 			str("NoError") {
 		};
-	};
+	};*/
 
 	enum EAudioSection {
 		eAS_Music,
@@ -63,16 +63,16 @@ namespace PortAudio {
 		virtual bool IsPlaying(long long id) = 0;
 		virtual AlternativeAudio::AudioSourceTime GetTime(long long id) = 0;
 		virtual void SetTime(long long id, double time) = 0;
-	public: //volume control
+	/*public: //volume control
 		virtual void SetMasterVol(float vol) = 0;
 		virtual float GetMasterVol() = 0;
 		virtual void SetVolume(float vol, EAudioSection section) = 0;
 		virtual float GetVolume(EAudioSection section) = 0;
 		virtual void SetSourceVolume(float vol, long long id) = 0;
-		virtual float GetSourceVolume(long long id) = 0;
-	public: //error checking
+		virtual float GetSourceVolume(long long id) = 0;*/
+	public:
 		virtual bool HasError() = 0;
-		virtual PASError GetError() = 0;
+		virtual AlternativeAudio::IError GetError() = 0;
 	};
 	using PortAudioRequestBus = AZ::EBus<PortAudioRequests>;
 } // namespace PortAudio
