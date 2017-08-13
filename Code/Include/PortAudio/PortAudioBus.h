@@ -4,24 +4,6 @@
 #include <AlternativeAudio\IAudioSource.h>
 
 namespace PortAudio {
-	/*struct PASError {
-		int code;
-		const char * str;
-
-		PASError() :
-			code(0),
-			str("NoError") {
-		};
-	};*/
-
-	enum EAudioSection {
-		eAS_Music,
-		eAS_SFX,
-		eAS_Voice,
-		eAS_Environment,
-		eAS_UI,
-		eAS_Count
-	};
 
 	enum EAudioResampleQuality {
 		eARQ_Best,
@@ -56,7 +38,7 @@ namespace PortAudio {
 		virtual PortAudioDevice GetDefaultDeviceInfo() = 0;
 		virtual AZStd::vector<PortAudioDevice> GetDevices() = 0;
 	public: //audio source control
-		virtual long long PlaySource(AlternativeAudio::IAudioSource * source, EAudioSection section) = 0;
+		virtual long long PlaySource(AlternativeAudio::IAudioSource * source) = 0;
 		virtual void PauseSource(long long id) = 0;
 		virtual void ResumeSource(long long id) = 0;
 		virtual void StopSource(long long id) = 0;

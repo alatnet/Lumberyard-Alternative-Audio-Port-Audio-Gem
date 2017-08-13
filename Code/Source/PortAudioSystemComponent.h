@@ -38,7 +38,7 @@ namespace PortAudio
 		PortAudioDevice GetDefaultDeviceInfo() { return this->devices[Pa_GetDefaultOutputDevice()]; }
 		AZStd::vector<PortAudioDevice> GetDevices() { return this->devices; }
 	protected: //audio source control
-		long long PlaySource(AlternativeAudio::IAudioSource * source, EAudioSection section);
+		long long PlaySource(AlternativeAudio::IAudioSource * source);
 		void PauseSource(long long id);
 		void ResumeSource(long long id);
 		void StopSource(long long id);
@@ -72,7 +72,6 @@ namespace PortAudio
 			long long endFrame{ 0 };
 			bool loop{ false };
 			bool paused{ false };
-			EAudioSection section{ eAS_Music };
 			float vol{ 1.0f };
 		};
 	private:

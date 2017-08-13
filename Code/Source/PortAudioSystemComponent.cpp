@@ -58,8 +58,6 @@ namespace PortAudio {
 		if (AZ::SerializeContext* serialize = azrtti_cast<AZ::SerializeContext*>(context)) {
 			auto classinfo = serialize->Class<PortAudioSystemComponent, AZ::Component>()
 				->Version(1)
-				//->Field("masterVol", &PortAudioSystemComponent::m_masterVol)
-				//->Field("volumes", &PortAudioSystemComponent::m_vols)
 				->Field("samplerate", &PortAudioSystemComponent::m_sampleRate)
 				->Field("audioFormat", &PortAudioSystemComponent::m_audioFormat)
 				->Field("device", &PortAudioSystemComponent::m_device)
@@ -175,6 +173,8 @@ namespace PortAudio {
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af21) return 3;
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af3) return 3;
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af31) return 4;
+		else if (type == AlternativeAudio::AudioFrame::Type::eT_af4) return 4;
+		else if (type == AlternativeAudio::AudioFrame::Type::eT_af41) return 5;
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af5) return 5;
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af51) return 6;
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af7) return 7;
@@ -273,7 +273,7 @@ namespace PortAudio {
 	}
 
 	//audio source control
-	long long PortAudioSystemComponent::PlaySource(AlternativeAudio::IAudioSource * source, EAudioSection section) {
+	long long PortAudioSystemComponent::PlaySource(AlternativeAudio::IAudioSource * source) {
 		//push new audio source to playing sources
 		if (source == nullptr || source == NULL) return -1;
 
@@ -283,7 +283,6 @@ namespace PortAudio {
 
 		PlayingAudioSource *playingSource = new PlayingAudioSource();
 		playingSource->audioSource = source;
-		playingSource->section = section;
 		playingSource->startFrame = 0;
 		playingSource->currentFrame = 0;
 		playingSource->endFrame = source->GetFrameLength();
@@ -426,6 +425,10 @@ namespace PortAudio {
 			return new AlternativeAudio::AudioFrame::af3[length];
 		case AlternativeAudio::AudioFrame::Type::eT_af31:
 			return new AlternativeAudio::AudioFrame::af31[length];
+		case AlternativeAudio::AudioFrame::Type::eT_af4:
+			return new AlternativeAudio::AudioFrame::af4[length];
+		case AlternativeAudio::AudioFrame::Type::eT_af41:
+			return new AlternativeAudio::AudioFrame::af41[length];
 		case AlternativeAudio::AudioFrame::Type::eT_af5:
 			return new AlternativeAudio::AudioFrame::af5[length];
 		case AlternativeAudio::AudioFrame::Type::eT_af51:
