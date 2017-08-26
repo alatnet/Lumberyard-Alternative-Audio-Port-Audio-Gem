@@ -13,7 +13,12 @@
       "Source/PortAudioModule.cpp",
       "Source/PortAudioSystemComponent.cpp",
       "Source/PortAudioSystemComponent.h",
-      "Source/PortAudioCommon.h"
+      "Source/PortAudioCommon.h",
+      "Source/PortAudioInternalBus.h"
+    ],
+    "Source/Device": [
+      "Source/PortAudioDevice.cpp",
+      "Source/PortAudioDevice.h"
     ]
   }
 }
