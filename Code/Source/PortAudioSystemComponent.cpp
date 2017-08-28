@@ -60,7 +60,7 @@ namespace PortAudio {
 				ec->Class<PortAudioSystemComponent>("PortAudio", "Port Audio playback system utilizing Alternative Audio Gem.")
 					->ClassElement(AZ::Edit::ClassElements::EditorData, "")
 					->Attribute(AZ::Edit::Attributes::Category, "Alternative Audio - Playback")
-					->Attribute(AZ::Edit::Attributes::AppearsInAddComponentMenu, AZ_CRC("System"))
+					->Attribute(AZ::Edit::Attributes::AppearsInAddComponentMenu, AZ_CRC("System", 0xc94d118b))
 					->Attribute(AZ::Edit::Attributes::AutoExpand, true)
 					;
 			}
@@ -68,15 +68,15 @@ namespace PortAudio {
 	}
 
 	void PortAudioSystemComponent::GetProvidedServices(AZ::ComponentDescriptor::DependencyArrayType& provided) {
-		provided.push_back(AZ_CRC("PortAudioService"));
+		provided.push_back(AZ_CRC("PortAudioService", 0x3553a550));
 	}
 
 	void PortAudioSystemComponent::GetIncompatibleServices(AZ::ComponentDescriptor::DependencyArrayType& incompatible) {
-		incompatible.push_back(AZ_CRC("PortAudioService"));
+		incompatible.push_back(AZ_CRC("PortAudioService", 0x3553a550));
 	}
 
 	void PortAudioSystemComponent::GetRequiredServices(AZ::ComponentDescriptor::DependencyArrayType& required) {
-		required.push_back(AZ_CRC("AlternativeAudioService"));
+		required.push_back(AZ_CRC("AlternativeAudioService", 0x2eb4e627));
 	}
 
 	void PortAudioSystemComponent::GetDependentServices(AZ::ComponentDescriptor::DependencyArrayType& dependent) {
@@ -114,7 +114,7 @@ namespace PortAudio {
 			AlternativeAudio::AlternativeAudioDeviceBus,
 			RegisterPlaybackLibrary,
 			"PortAudio",
-			AZ_CRC("PortAudio"),
+			AZ_CRC("PortAudio", 0x2a7a2a31),
 			this
 		);
 		

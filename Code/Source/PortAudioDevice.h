@@ -43,6 +43,7 @@ namespace PortAudio {
 			bool loop{ false };
 			bool paused{ false };
 			float vol{ 1.0f };
+			AlternativeAudio::AAFlagHandler flags;
 		};
 	private:
 		typedef AZStd::unordered_map<long long, PlayingAudioSource *> PlayingAudioSourcesMap;

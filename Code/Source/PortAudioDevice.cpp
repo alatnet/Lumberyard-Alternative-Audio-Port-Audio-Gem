@@ -160,7 +160,7 @@ namespace PortAudio {
 
 		long long uID = this->m_nextPlayID++;
 
-		int flags = source->GetFlags();
+		long long flags = source->GetFlags();
 
 		PlayingAudioSource *playingSource = new PlayingAudioSource();
 		playingSource->audioSource = source;
@@ -169,6 +169,7 @@ namespace PortAudio {
 		playingSource->endFrame = source->GetFrameLength();
 		playingSource->loop = ((flags & AlternativeAudio::eAF_Loop) == 1);
 		playingSource->paused = ((flags & AlternativeAudio::eAF_PausedOnStart) == 1);
+		playingSource->flags.SetFlags(flags);
 
 		this->m_callbackMutex.lock();
 		this->m_playingAudioSource.insert(AZStd::make_pair<>(uID, playingSource));
@@ -265,6 +266,8 @@ namespace PortAudio {
 			return paComplete; //if we have no audio sources, why are we running?
 		}
 
+		long long dflags = this->m_flags.GetFlags();
+
 		int pachannels = PortAudioDevice::getNumberOfChannels(this->m_audioFormat);
 
 		{ //clear the buffer
@@ -290,6 +293,7 @@ namespace PortAudio {
 			PlayingAudioSource* playingsource = entry.second;
 			playingsource->audioSource->Seek(playingsource->currentFrame); //seek to the current position of the file
 			AlternativeAudio::AudioFrame::Type sourceFrameType = playingsource->audioSource->GetFrameType();
+			long long prevFlags = playingsource->flags.GetFlags();
 
 			//get the ratio of the sample rate conversion
 			double ratio = this->m_sampleRate / playingsource->audioSource->GetSampleRate();
@@ -310,7 +314,8 @@ namespace PortAudio {
 					AlternativeAudio::AADSPSection::eDS_PerSource_BC,
 					sourceFrameType,
 					(float*)srcframes,
-					framesPerBuffer
+					framesPerBuffer,
+					&playingsource->flags
 				);
 
 				//convert the audio source's number of channels to port audio's number of channels.
@@ -332,7 +337,8 @@ namespace PortAudio {
 					AlternativeAudio::AADSPSection::eDS_PerSource_AC,
 					this->m_audioFormat,
 					(float*)framesOut,
-					framesPerBuffer
+					framesPerBuffer,
+					&playingsource->flags
 				);
 			} else { //otherwise
 					 //read frame data.
@@ -350,7 +356,8 @@ namespace PortAudio {
 					AlternativeAudio::AADSPSection::eDS_PerSource_BC,
 					sourceFrameType,
 					(float*)srcframes,
-					framesPerBuffer
+					framesPerBuffer,
+					&playingsource->flags
 				);
 
 				//convert the audio source's number of channels to port audio's number of channels.
@@ -372,7 +379,8 @@ namespace PortAudio {
 					AlternativeAudio::AADSPSection::eDS_PerSource_AC,
 					this->m_audioFormat,
 					(float*)convertedSrcFrames,
-					framesPerBuffer
+					framesPerBuffer,
+					&playingsource->flags
 				);
 
 				//convert samplerate.
@@ -407,8 +415,10 @@ namespace PortAudio {
 				AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
 				this->m_audioFormat,
 				(float*)framesOut,
-				framesPerBuffer
+				framesPerBuffer,
+				&playingsource->flags
 			);
+			playingsource->flags.SetFlags(prevFlags);
 
 			//mix audio
 			EBUS_EVENT(
@@ -438,8 +448,11 @@ namespace PortAudio {
 			AlternativeAudio::AADSPSection::eDS_Output,
 			this->m_audioFormat,
 			(float*)outputBuffer,
-			framesPerBuffer
+			framesPerBuffer,
+			&this->m_flags
 		);
+
+		this->m_flags.SetFlags(dflags);
 
 		//removed stopped audio files.
 		while (m_stoppedAudioFiles.size() > 0) {
