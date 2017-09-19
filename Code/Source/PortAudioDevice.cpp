@@ -12,6 +12,8 @@ namespace PortAudio {
 		m_device = Pa_GetDefaultOutputDevice();
 		m_rsQuality = AlternativeAudio::eAARQ_Linear;
 
+		m_isMaster = false;
+
 		const PaDeviceInfo * info = Pa_GetDeviceInfo((PaDeviceIndex)this->m_device);
 
 		this->m_info.name = AZStd::string(info->name);
@@ -255,6 +257,12 @@ namespace PortAudio {
 		this->m_callbackMutex.unlock();
 	}
 
+	void PortAudioDevice::SetMaster(bool onoff) {
+		this->m_callbackMutex.lock();
+		m_isMaster = onoff;
+		this->m_callbackMutex.unlock();
+	}
+
 	int PortAudioDevice::paCallbackCommon(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData) {
 		//redirect to the individual callback. (gives us individualized and possibly multiple streams at the same time).
 		return ((PortAudioDevice *)userData)->paCallback(inputBuffer, outputBuffer, framesPerBuffer, timeInfo, statusFlags, userData);
@@ -308,15 +316,24 @@ namespace PortAudio {
 				playingsource->currentFrame += frameLength;
 
 				//apply before convert dsp
-				EBUS_EVENT(
-					AlternativeAudio::AlternativeAudioDSPBus,
-					ProcessEffects,
-					AlternativeAudio::AADSPSection::eDS_PerSource_BC,
-					sourceFrameType,
-					(float*)srcframes,
-					framesPerBuffer,
-					&playingsource->flags
-				);
+				if (m_isMaster)
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioDSPBus,
+						ProcessEffects,
+						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+						sourceFrameType,
+						(float*)srcframes,
+						framesPerBuffer,
+						&playingsource->flags
+					);
+				else
+					this->ProcessEffects(
+						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+						sourceFrameType,
+						(float*)srcframes,
+						framesPerBuffer,
+						&playingsource->flags
+					);
 
 				//convert the audio source's number of channels to port audio's number of channels.
 				EBUS_EVENT(
@@ -330,18 +347,27 @@ namespace PortAudio {
 				);
 				delete[] srcframes; //free up the memory.
 
-									//apply after convert dsp
-				EBUS_EVENT(
-					AlternativeAudio::AlternativeAudioDSPBus,
-					ProcessEffects,
-					AlternativeAudio::AADSPSection::eDS_PerSource_AC,
-					this->m_audioFormat,
-					(float*)framesOut,
-					framesPerBuffer,
-					&playingsource->flags
-				);
+				//apply after convert dsp
+				if (m_isMaster)
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioDSPBus,
+						ProcessEffects,
+						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+						this->m_audioFormat,
+						(float*)framesOut,
+						framesPerBuffer,
+						&playingsource->flags
+					);
+				else
+					this->ProcessEffects(
+						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+						this->m_audioFormat,
+						(float*)framesOut,
+						framesPerBuffer,
+						&playingsource->flags
+					);
 			} else { //otherwise
-					 //read frame data.
+				//read frame data.
 				long long framesToRead = (((long long)((double)framesPerBuffer / ratio)));
 				AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesToRead);
 				long long framesRead = playingsource->audioSource->GetFrames(framesToRead, (float *)srcframes); //get the data.
@@ -350,15 +376,24 @@ namespace PortAudio {
 				AlternativeAudio::AudioFrame::Frame * convertedSrcFrames = PortAudioDevice::CreateBuffer(this->m_audioFormat, framesToRead);
 
 				//apply before convert dsp
-				EBUS_EVENT(
-					AlternativeAudio::AlternativeAudioDSPBus,
-					ProcessEffects,
-					AlternativeAudio::AADSPSection::eDS_PerSource_BC,
-					sourceFrameType,
-					(float*)srcframes,
-					framesPerBuffer,
-					&playingsource->flags
-				);
+				if (m_isMaster)
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioDSPBus,
+						ProcessEffects,
+						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+						sourceFrameType,
+						(float*)srcframes,
+						framesPerBuffer,
+						&playingsource->flags
+					);
+				else
+					this->ProcessEffects(
+						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+						sourceFrameType,
+						(float*)srcframes,
+						framesPerBuffer,
+						&playingsource->flags
+					);
 
 				//convert the audio source's number of channels to port audio's number of channels.
 				EBUS_EVENT(
@@ -373,15 +408,24 @@ namespace PortAudio {
 				delete[] srcframes;
 
 				//apply after convert dsp
-				EBUS_EVENT(
-					AlternativeAudio::AlternativeAudioDSPBus,
-					ProcessEffects,
-					AlternativeAudio::AADSPSection::eDS_PerSource_AC,
-					this->m_audioFormat,
-					(float*)convertedSrcFrames,
-					framesPerBuffer,
-					&playingsource->flags
-				);
+				if (m_isMaster)
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioDSPBus,
+						ProcessEffects,
+						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+						this->m_audioFormat,
+						(float*)convertedSrcFrames,
+						framesPerBuffer,
+						&playingsource->flags
+					);
+				else
+					this->ProcessEffects(
+						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+						this->m_audioFormat,
+						(float*)convertedSrcFrames,
+						framesPerBuffer,
+						&playingsource->flags
+					);
 
 				//convert samplerate.
 				SRC_DATA src_data;
@@ -409,15 +453,25 @@ namespace PortAudio {
 			}
 
 			//apply after resampling dsp
-			EBUS_EVENT(
-				AlternativeAudio::AlternativeAudioDSPBus,
-				ProcessEffects,
-				AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
-				this->m_audioFormat,
-				(float*)framesOut,
-				framesPerBuffer,
-				&playingsource->flags
-			);
+			if (m_isMaster)
+				EBUS_EVENT(
+					AlternativeAudio::AlternativeAudioDSPBus,
+					ProcessEffects,
+					AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
+					this->m_audioFormat,
+					(float*)framesOut,
+					framesPerBuffer,
+					&playingsource->flags
+				);
+			else
+				this->ProcessEffects(
+					AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
+					this->m_audioFormat,
+					(float*)framesOut,
+					framesPerBuffer,
+					&playingsource->flags
+				);
+
 			playingsource->flags.SetFlags(prevFlags);
 
 			//mix audio
@@ -441,16 +495,25 @@ namespace PortAudio {
 
 		delete[] framesOut; //free up memory
 
-							//Apply Output DSP
-		EBUS_EVENT(
-			AlternativeAudio::AlternativeAudioDSPBus,
-			ProcessEffects,
-			AlternativeAudio::AADSPSection::eDS_Output,
-			this->m_audioFormat,
-			(float*)outputBuffer,
-			framesPerBuffer,
-			&this->m_flags
-		);
+		//Apply Output DSP
+		if (m_isMaster)
+			EBUS_EVENT(
+				AlternativeAudio::AlternativeAudioDSPBus,
+				ProcessEffects,
+				AlternativeAudio::AADSPSection::eDS_Output,
+				this->m_audioFormat,
+				(float*)outputBuffer,
+				framesPerBuffer,
+				&this->m_flags
+			);
+		else
+			this->ProcessEffects(
+				AlternativeAudio::AADSPSection::eDS_Output,
+				this->m_audioFormat,
+				(float*)outputBuffer,
+				framesPerBuffer,
+				&this->m_flags
+			);
 
 		this->m_flags.SetFlags(dflags);
 

@@ -24,6 +24,10 @@ namespace PortAudio {
 		AlternativeAudio::AudioSourceTime GetTime(long long id);
 		void SetTime(long long id, double time);
 	public:
+		void SetMaster(bool onoff);
+	private:
+		bool m_isMaster;
+	public:
 		static void Reflect(AZ::SerializeContext* serialize) {
 			serialize->Class<PortAudioDevice, OAudioDevice>()
 				->Version(0)
