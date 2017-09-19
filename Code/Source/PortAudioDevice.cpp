@@ -372,7 +372,7 @@ namespace PortAudio {
 				AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesToRead);
 				long long framesRead = playingsource->audioSource->GetFrames(framesToRead, (float *)srcframes); //get the data.
 
-																												//convert to port audio's channels.
+				//convert to port audio's channels.
 				AlternativeAudio::AudioFrame::Frame * convertedSrcFrames = PortAudioDevice::CreateBuffer(this->m_audioFormat, framesToRead);
 
 				//apply before convert dsp

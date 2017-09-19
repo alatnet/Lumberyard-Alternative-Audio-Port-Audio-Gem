@@ -39,6 +39,7 @@ namespace PortAudio
 		static int m_initializeCount;
 		static bool m_initialized;
 		bool m_devicesEnumerated;
+		bool m_registered;
 
 		AZStd::vector<AlternativeAudio::OAudioDeviceInfo> devices;
 	public:

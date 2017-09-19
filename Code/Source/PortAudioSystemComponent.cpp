@@ -15,6 +15,8 @@ namespace PortAudio {
 	bool PortAudioSystemComponent::m_initialized = false;
 
 	PortAudioSystemComponent::PortAudioSystemComponent() {
+		m_registered = m_devicesEnumerated = false;
+
 		if (PortAudioSystemComponent::m_initializeCount == 0) {
 			PortAudioSystemComponent::m_initializeCount++;
 			PortAudioSystemComponent::m_initialized = true;
@@ -109,6 +111,11 @@ namespace PortAudio {
 	void PortAudioSystemComponent::Activate() {
 		if (this->m_hasError) return;
 
+		PortAudioRequestBus::Handler::BusConnect();
+		PortAudioInternalNotificationsBus::Handler::BusConnect();
+
+		if (this->m_registered) return;
+
 		AZ_Printf("[PortAudio]", "[PortAudio] Registering Port Audio.\n");
 		EBUS_EVENT(
 			AlternativeAudio::AlternativeAudioDeviceBus,
@@ -122,9 +129,6 @@ namespace PortAudio {
 		AZ_Printf("[PortAudio]", "[PortAudio] libsamplerate Version: %s\n", src_get_version());
 
 		AZ_Printf("[PortAudio]", "[PortAudio] Registration Complete.\n");
-
-		PortAudioRequestBus::Handler::BusConnect();
-		PortAudioInternalNotificationsBus::Handler::BusConnect();
 	}
 
 	void PortAudioSystemComponent::Deactivate() {
