@@ -1,6 +1,7 @@
 #include "StdAfx.h"
 
 #include <PortAudioDevice.h>
+#include <PortAudio\PortAudioUserData.h>
 #include <AlternativeAudio\AlternativeAudioBus.h>
 #include "PortAudioInternalBus.h"
 
@@ -58,6 +59,8 @@ namespace PortAudio {
 	void PortAudioDevice::SetStream(double samplerate, AlternativeAudio::AudioFrame::Type audioFormat, void* userdata) {
 		//if (device == -1) device = Pa_GetDefaultOutputDevice();
 
+		PortAudioUserData* paUserData = static_cast<PortAudioUserData*>(userdata);
+
 		int streamActive = 0;
 		if (this->m_pAudioStream) {
 			streamActive = Pa_IsStreamActive(this->m_pAudioStream);
@@ -72,7 +75,8 @@ namespace PortAudio {
 
 		this->m_sampleRate = samplerate;
 		//this->m_hostApiSpecificStreamInfo = hostApiSpecificStreamInfo;
-		this->m_hostApiSpecificStreamInfo = userdata;
+		if (paUserData) this->m_hostApiSpecificStreamInfo = paUserData->hostApiSpecificStreamInfo;
+		else this->m_hostApiSpecificStreamInfo = nullptr;
 
 		const PaDeviceInfo * info = Pa_GetDeviceInfo((PaDeviceIndex)this->m_device);
 
@@ -83,9 +87,13 @@ namespace PortAudio {
 		streamParams.sampleFormat = paFloat32; // 32bit float format
 		//streamParams.suggestedLatency = PAS_Millsecond(200); //200 ms ought to satisfy even the worst sound card - effects delta time (higher ms - higher delta)
 
-		streamParams.suggestedLatency = info->defaultLowOutputLatency;
+		if (paUserData && paUserData->suggestedLatency != -1.0) streamParams.suggestedLatency = paUserData->suggestedLatency;
+		else streamParams.suggestedLatency = info->defaultLowOutputLatency;
 
 		this->m_audioFormat = audioFormat;
+
+		unsigned long streamFlags = paNoFlag; /* no special modes (clip off, dither off) */
+		if (paUserData && paUserData->streamFlags != 0) streamFlags = paUserData->streamFlags;
 
 		int err = Pa_OpenStream(
 			&this->m_pAudioStream,
@@ -93,7 +101,7 @@ namespace PortAudio {
 			&streamParams,
 			this->m_sampleRate,
 			paFramesPerBufferUnspecified, // let portaudio choose the buffersize
-			paNoFlag,/* no special modes (clip off, dither off) */
+			streamFlags,
 			PortAudioDevice::paCallbackCommon, //set the callback to be the function that calls the per class callback
 			this
 		);

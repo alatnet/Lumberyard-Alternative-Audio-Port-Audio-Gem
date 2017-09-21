@@ -7,7 +7,8 @@
   },
   "auto": {
     "Include": [
-      "Include/PortAudio/PortAudioBus.h"
+      "Include/PortAudio/PortAudioBus.h",
+      "Include/PortAudio/PortAudioUserData.h"
     ],
     "Source": [
       "Source/PortAudioModule.cpp",

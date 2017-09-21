@@ -9,9 +9,6 @@ namespace PortAudio {
 	public:
 		static const AZ::EBusHandlerPolicy HandlerPolicy = AZ::EBusHandlerPolicy::Single;
 		static const AZ::EBusAddressPolicy AddressPolicy = AZ::EBusAddressPolicy::Single;
-	/*public:
-		virtual bool HasError() = 0;
-		virtual AlternativeAudio::AAError GetError() = 0;*/
 	};
 	using PortAudioRequestBus = AZ::EBus<PortAudioRequests>;
 } // namespace PortAudio
