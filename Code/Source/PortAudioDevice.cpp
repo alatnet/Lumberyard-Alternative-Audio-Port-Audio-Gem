@@ -12,8 +12,8 @@ namespace PortAudio {
 		m_pAudioStream = nullptr;
 		m_device = Pa_GetDefaultOutputDevice();
 		m_rsQuality = AlternativeAudio::eAARQ_Linear;
-
 		m_isMaster = false;
+		m_isQueue = false;
 
 		const PaDeviceInfo * info = Pa_GetDeviceInfo((PaDeviceIndex)this->m_device);
 
@@ -29,6 +29,8 @@ namespace PortAudio {
 		m_pAudioStream = nullptr;
 		m_device = deviceIndex;
 		m_rsQuality = AlternativeAudio::eAARQ_Linear;
+		m_isMaster = false;
+		m_isQueue = false;
 
 		const PaDeviceInfo * info = Pa_GetDeviceInfo((PaDeviceIndex)this->m_device);
 
@@ -180,7 +182,12 @@ namespace PortAudio {
 		playingSource->loop = ((flags & AlternativeAudio::eAF_Loop) == 1);
 		playingSource->paused = ((flags & AlternativeAudio::eAF_PausedOnStart) == 1);
 		playingSource->flags.SetFlags(flags);
-
+		
+		if (this->m_isQueue) {
+			m_queueCommands.push_back(new PlayQueueCommand(uID, playingSource, this));
+			return uID;
+		}
+		
 		this->m_callbackMutex.lock();
 		this->m_playingAudioSource.insert(AZStd::make_pair<>(uID, playingSource));
 		this->m_callbackMutex.unlock();
@@ -196,6 +203,11 @@ namespace PortAudio {
 	}
 
 	void PortAudioDevice::PauseSource(long long id) {
+		if (this->m_isQueue) {
+			m_queueCommands.push_back(new PauseQueueCommand(id, this));
+			return;
+		}
+
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) == this->m_playingAudioSource.end()) {
 			m_callbackMutex.unlock();
@@ -206,6 +218,11 @@ namespace PortAudio {
 	}
 
 	void PortAudioDevice::ResumeSource(long long id) {
+		if (this->m_isQueue) {
+			m_queueCommands.push_back(new ResumeQueueCommand(id, this));
+			return;
+		}
+
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) == this->m_playingAudioSource.end()) {
 			m_callbackMutex.unlock();
@@ -222,6 +239,11 @@ namespace PortAudio {
 	}
 
 	void PortAudioDevice::StopSource(long long id) {
+		if (this->m_isQueue) {
+			m_queueCommands.push_back(new StopQueueCommand(id, this));
+			return;
+		}
+
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end()) this->m_playingAudioSource.erase(id);
 		this->m_callbackMutex.unlock();
@@ -263,6 +285,46 @@ namespace PortAudio {
 			this->m_playingAudioSource[id]->currentFrame = setFrame;
 		}
 		this->m_callbackMutex.unlock();
+	}
+
+	void PortAudioDevice::Queue(bool startstop) {
+		if (startstop) {
+			m_isQueue = true;
+		} else {
+			m_isQueue = false;
+			//execute queued commands
+			this->m_callbackMutex.lock();
+			/*for (QueuedCommand* cmd : this->m_queueCommands) {
+				cmd->Execute();
+
+				if (cmd->getType() == PLAY || cmd->getType() == RESUME) {
+					//check if stream is stopped, if it is, start it up.
+					if (Pa_IsStreamActive(this->m_pAudioStream) != 1) {
+						if (Pa_IsStreamStopped(this->m_pAudioStream) != 1) Pa_StopStream(this->m_pAudioStream); //resets stream time.
+						Pa_StartStream(this->m_pAudioStream);
+					}
+				}
+			}*/
+
+			while (!this->m_queueCommands.empty()) {
+				QueuedCommand* cmd = this->m_queueCommands.back();
+				cmd->Execute();
+
+				if (cmd->getType() == PLAY || cmd->getType() == RESUME) {
+					//check if stream is stopped, if it is, start it up.
+					if (Pa_IsStreamActive(this->m_pAudioStream) != 1) {
+						if (Pa_IsStreamStopped(this->m_pAudioStream) != 1) Pa_StopStream(this->m_pAudioStream); //resets stream time.
+						Pa_StartStream(this->m_pAudioStream);
+					}
+				}
+				
+				this->m_queueCommands.pop_back();
+				delete cmd;
+			}
+
+			//this->m_queueCommands.clear();
+			this->m_callbackMutex.unlock();
+		}
 	}
 
 	void PortAudioDevice::SetMaster(bool onoff) {
@@ -582,4 +644,23 @@ namespace PortAudio {
 		else if (type == AlternativeAudio::AudioFrame::Type::eT_af71) return 8;
 		return 1;
 	}
+
+	//-----------------------------
+	// Queue command system
+	//-----------------------------
+	void PortAudioDevice::PlayQueueCommand::Execute() {
+		m_pad->m_playingAudioSource.insert(AZStd::make_pair<>(m_uID, m_pasrc));
+	}
+	void PortAudioDevice::PauseQueueCommand::Execute() {
+		if (m_pad->m_playingAudioSource.find(m_uID) == m_pad->m_playingAudioSource.end()) return;
+		m_pad->m_playingAudioSource[m_uID]->paused = true;
+	}
+	void PortAudioDevice::ResumeQueueCommand::Execute() {
+		if (m_pad->m_playingAudioSource.find(m_uID) == m_pad->m_playingAudioSource.end()) return;
+		m_pad->m_playingAudioSource[m_uID]->paused = false;
+	}
+	void PortAudioDevice::StopQueueCommand::Execute() {
+		if (m_pad->m_playingAudioSource.find(m_uID) != m_pad->m_playingAudioSource.end()) m_pad->m_playingAudioSource.erase(m_uID);
+	}
+	//-----------------------------
 }

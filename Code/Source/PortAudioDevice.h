@@ -24,9 +24,12 @@ namespace PortAudio {
 		AlternativeAudio::AudioSourceTime GetTime(long long id);
 		void SetTime(long long id, double time);
 	public:
+		void Queue(bool startstop);
+	public:
 		void SetMaster(bool onoff);
 	private:
 		bool m_isMaster;
+		bool m_isQueue;
 	public:
 		static void Reflect(AZ::SerializeContext* serialize) {
 			serialize->Class<PortAudioDevice, OAudioDevice>()
@@ -74,5 +77,51 @@ namespace PortAudio {
 		int paCallback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData);
 	public:
 		static int paCallbackCommon(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData);
+
+	private:
+		enum QueueType { PLAY,PAUSE,RESUME,STOP };
+		class QueuedCommand {
+		public:
+			QueuedCommand(long long uID, PortAudioDevice* pad) : m_uID(uID), m_pad(pad) {}
+		public:
+			virtual QueueType getType() = 0;
+			virtual void Execute() = 0;
+		public:
+			long long m_uID;
+			PortAudioDevice* m_pad;
+		};
+
+		class PlayQueueCommand : public QueuedCommand {
+		public:
+			PlayQueueCommand(long long uID, PlayingAudioSource* pasrc, PortAudioDevice* pad) : QueuedCommand(uID, pad), m_pasrc(pasrc) {}
+			void Execute();
+			QueueType getType() { return PLAY; }
+		public:
+			PlayingAudioSource* m_pasrc;
+		};
+
+		class PauseQueueCommand : public QueuedCommand {
+		public:
+			PauseQueueCommand(long long uID, PortAudioDevice* pad) : QueuedCommand(uID, pad) {}
+			void Execute();
+			QueueType getType() { return PAUSE; }
+		};
+
+		class ResumeQueueCommand : public QueuedCommand {
+		public:
+			ResumeQueueCommand(long long uID, PortAudioDevice* pad) : QueuedCommand(uID, pad) {}
+			void Execute();
+			QueueType getType() { return RESUME; }
+		};
+
+		class StopQueueCommand : public QueuedCommand {
+		public:
+			StopQueueCommand(long long uID, PortAudioDevice* pad) : QueuedCommand(uID, pad) {}
+			void Execute();
+			QueueType getType() { return STOP; }
+		};
+
+	private:
+		AZStd::vector<QueuedCommand *> m_queueCommands;
 	};
 }

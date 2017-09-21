@@ -34,9 +34,11 @@ namespace PortAudio {
 		PortAudioSystemComponent::m_initializeCount--;
 
 		if (!this->deviceMap.empty()) {
-			for (AZStd::pair<long long, AlternativeAudio::OAudioDevice*> entry : this->deviceMap)
-				delete entry.second;
-			this->deviceMap.clear();
+			for (AZStd::pair<long long, AlternativeAudio::OAudioDevice*> entry : this->deviceMap) //for each device
+				while (entry.second->NumRefs() != 0) //while there are still references to an open device.
+					entry.second->Release(); //release them.
+				//delete entry.second;
+			this->deviceMap.clear(); //clear the device map.
 		}
 
 		if (PortAudioSystemComponent::m_initializeCount < 0) PortAudioSystemComponent::m_initializeCount = 0;
