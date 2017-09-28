@@ -1,59 +1,59 @@
 from waflib.TaskGen import feature
 
-@feature('copy_audio_dlls')
-def feature_copy_audio_dlls(self):
-	platform = self.bld.env['PLATFORM']
-	configuration = self.bld.env['CONFIGURATION']
+@feature('copy_portaudio')
+def feature_copy_portaudio(self):
+    platform = self.bld.env['PLATFORM']
+    configuration = self.bld.env['CONFIGURATION']
 
-	#for the windows platform
-	if platform == 'win_x64' or platform == 'win_x64_vs2015' or platform == 'win_x64_vs2013':
-		output_folder = self.bld.get_output_folders(platform, configuration)[0]
+    #for the windows platform
+    if platform == 'win_x64' or platform == 'win_x64_vs2015' or platform == 'win_x64_vs2013':
+        output_folder = self.bld.get_output_folders(platform, configuration)[0]
 
-		#copy libsamplerate
-		sample_source_file = self.bld.CreateRootRelativePath('Gems/PortAudio/3rdParty/libsamplerate/bin/libsamplerate-0.dll')
-		self.create_task('copy_outputs', self.bld.root.make_node(sample_source_file), output_folder.make_node('libsamplerate-0.dll'))
+        #copy libsamplerate
+        sample_source_file = self.bld.CreateRootRelativePath('Gems/' + self.name + '/3rdParty/libsamplerate/bin/libsamplerate-0.dll')
+        self.create_task('copy_outputs', self.bld.root.make_node(sample_source_file), output_folder.make_node('libsamplerate-0.dll'))
 
-		#depending on the configuration, copy portaudio
-		if configuration == 'debug' or configuration == 'profile':
-			port_source_file = self.bld.CreateRootRelativePath('Gems/PortAudio/3rdParty/portaudio/bin/Debug/portaudio_x64.dll')
-			self.create_task('copy_outputs', self.bld.root.make_node(port_source_file), output_folder.make_node('portaudio_x64.dll'))
-		else:
-			port_source_file = self.bld.CreateRootRelativePath('Gems/PortAudio/3rdParty/portaudio/bin/Release/portaudio_x64.dll')
-			self.create_task('copy_outputs', self.bld.root.make_node(port_source_file), output_folder.make_node('portaudio_x64.dll'))
+        #depending on the configuration, copy portaudio
+        if configuration == 'debug' or configuration == 'profile':
+            port_source_file = self.bld.CreateRootRelativePath('Gems/' + self.name + '/3rdParty/portaudio/bin/Debug/portaudio_x64.dll')
+            self.create_task('copy_outputs', self.bld.root.make_node(port_source_file), output_folder.make_node('portaudio_x64.dll'))
+        else:
+            port_source_file = self.bld.CreateRootRelativePath('Gems/' + self.name + '/3rdParty/portaudio/bin/Release/portaudio_x64.dll')
+            self.create_task('copy_outputs', self.bld.root.make_node(port_source_file), output_folder.make_node('portaudio_x64.dll'))
 
 def build(bld):
     bld.DefineGem(
         # Add custom build options here
-		features = [ 'copy_audio_dlls' ],
+        features = [ 'copy_portaudio' ],
 
         includes    = [
-			bld.Path('Code/CryEngine/CryAction'),
-			bld.Path('Gems/PortAudio/3rdParty/libsamplerate/include'),
-			bld.Path('Gems/PortAudio/3rdParty/portaudio/include')
-		],
+            bld.Path('Code/CryEngine/CryAction'),
+            bld.path.abspath() + '/../3rdParty/portaudio/include',
+            bld.path.abspath() + '/../3rdParty/libsamplerate/include'
+        ],
 
         lib = [
             'portaudio_x64',
-			'libsamplerate-0'
+            'libsamplerate-0'
         ],
               
         libpath = [
-            bld.Path('Gems/PortAudio/3rdParty/libsamplerate/lib')
+            bld.path.abspath() + '/../3rdParty/libsamplerate/lib'
         ],
                   
         debug_libpath = [
-            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Debug')
+            bld.path.abspath() + '/../3rdParty/portaudio/lib/Debug'
         ],
                   
         profile_libpath = [
-            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Debug')
+            bld.path.abspath() + '/../3rdParty/portaudio/lib/Debug'
         ],
 
         performance_libpath = [
-            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Release')
+            bld.path.abspath() + '/../3rdParty/portaudio/lib/Release'
         ],
 
         release_libpath = [
-            bld.Path('Gems/PortAudio/3rdParty/portaudio/lib/Release')
+            bld.path.abspath() + '/../3rdParty/portaudio/lib/Release'
         ],
     )
