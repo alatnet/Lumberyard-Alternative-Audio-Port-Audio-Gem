@@ -16,13 +16,18 @@ namespace PortAudio {
 		void SetResampleQuality(AlternativeAudio::AAResampleQuality quality);
 		AlternativeAudio::OAudioDeviceInfo GetDeviceInfo() { return this->m_info; }
 	public:
-		long long PlaySource(AlternativeAudio::IAudioSource * source);
-		void PauseSource(long long id);
-		void ResumeSource(long long id);
-		void StopSource(long long id);
-		bool IsPlaying(long long id);
-		AlternativeAudio::AudioSourceTime GetTime(long long id);
-		void SetTime(long long id, double time);
+		unsigned long long PlaySource(AlternativeAudio::IAudioSource * source);
+		void PlaySFXSource(AlternativeAudio::IAudioSource * source);
+		void PauseSource(unsigned long long id);
+		void ResumeSource(unsigned long long id);
+		void StopSource(unsigned long long id);
+		bool IsPlaying(unsigned long long id);
+		AlternativeAudio::AudioSourceTime GetTime(unsigned long long id);
+		void SetTime(unsigned long long id, double time);
+	public:
+		void PauseAll();
+		void ResumeAll();
+		void StopAll();
 	public:
 		void Queue(bool startstop);
 	public:
@@ -30,6 +35,7 @@ namespace PortAudio {
 	private:
 		bool m_isMaster;
 		bool m_isQueue;
+		bool m_isAllPaused;
 	public:
 		static void Reflect(AZ::SerializeContext* serialize) {
 			serialize->Class<PortAudioDevice, OAudioDevice>()
@@ -53,12 +59,15 @@ namespace PortAudio {
 			AlternativeAudio::AAFlagHandler flags;
 		};
 	private:
-		typedef AZStd::unordered_map<long long, PlayingAudioSource *> PlayingAudioSourcesMap;
+		typedef AZStd::unordered_map<unsigned long long, PlayingAudioSource *> PlayingAudioSourcesMap;
 		PlayingAudioSourcesMap m_playingAudioSource;
 
-		long long m_nextPlayID;
+		typedef AZStd::vector<PlayingAudioSource *> PlayingSFXAudioSourcesVector;
+		PlayingSFXAudioSourcesVector m_playingSFXAudioSource;
 
-		std::vector<long long> m_stoppedAudioFiles;
+		unsigned long long m_nextPlayID;
+
+		//std::vector<unsigned long long> m_stoppedAudioFiles;
 	private: //audio stream
 		PaStream *m_pAudioStream;
 		AlternativeAudio::AudioFrame::Type m_audioFormat;
@@ -94,6 +103,15 @@ namespace PortAudio {
 		class PlayQueueCommand : public QueuedCommand {
 		public:
 			PlayQueueCommand(long long uID, PlayingAudioSource* pasrc, PortAudioDevice* pad) : QueuedCommand(uID, pad), m_pasrc(pasrc) {}
+			void Execute();
+			QueueType getType() { return PLAY; }
+		public:
+			PlayingAudioSource* m_pasrc;
+		};
+
+		class PlaySFXQueueCommand : public QueuedCommand {
+		public:
+			PlaySFXQueueCommand(PlayingAudioSource* pasrc, PortAudioDevice* pad) : QueuedCommand(-1, pad), m_pasrc(pasrc) {}
 			void Execute();
 			QueueType getType() { return PLAY; }
 		public:

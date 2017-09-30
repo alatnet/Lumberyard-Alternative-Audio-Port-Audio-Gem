@@ -112,8 +112,6 @@ namespace PortAudio {
 
 	void PortAudioSystemComponent::Activate() {
 		if (this->m_hasError) return;
-
-		PortAudioRequestBus::Handler::BusConnect();
 		PortAudioInternalNotificationsBus::Handler::BusConnect();
 
 		if (this->m_registered) return;
@@ -135,8 +133,6 @@ namespace PortAudio {
 
 	void PortAudioSystemComponent::Deactivate() {
 		if (this->m_hasError) return;
-
-		PortAudioRequestBus::Handler::BusDisconnect();
 		PortAudioInternalNotificationsBus::Handler::BusDisconnect();
 	}
 

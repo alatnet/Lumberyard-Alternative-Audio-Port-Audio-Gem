@@ -14,6 +14,7 @@ namespace PortAudio {
 		m_rsQuality = AlternativeAudio::eAARQ_Linear;
 		m_isMaster = false;
 		m_isQueue = false;
+		m_isAllPaused = false;
 
 		const PaDeviceInfo * info = Pa_GetDeviceInfo((PaDeviceIndex)this->m_device);
 
@@ -31,6 +32,7 @@ namespace PortAudio {
 		m_rsQuality = AlternativeAudio::eAARQ_Linear;
 		m_isMaster = false;
 		m_isQueue = false;
+		m_isAllPaused = false;
 
 		const PaDeviceInfo * info = Pa_GetDeviceInfo((PaDeviceIndex)this->m_device);
 
@@ -166,7 +168,7 @@ namespace PortAudio {
 		this->m_info.currentResampleQuality = quality;
 	}
 
-	long long PortAudioDevice::PlaySource(AlternativeAudio::IAudioSource * source) {
+	unsigned long long PortAudioDevice::PlaySource(AlternativeAudio::IAudioSource * source) {
 		//push new audio source to playing sources
 		if (source == nullptr || source == NULL) return -1;
 
@@ -193,16 +195,50 @@ namespace PortAudio {
 		this->m_callbackMutex.unlock();
 
 		//check if stream is stopped, if it is, start it up.
-		if (Pa_IsStreamActive(this->m_pAudioStream) != 1) {
+		if (Pa_IsStreamActive(this->m_pAudioStream) != 1 && !m_isAllPaused) {
 			if (Pa_IsStreamStopped(this->m_pAudioStream) != 1) Pa_StopStream(this->m_pAudioStream); //resets stream time.
 			Pa_StartStream(this->m_pAudioStream);
 		}
 
 		return uID;
-
 	}
 
-	void PortAudioDevice::PauseSource(long long id) {
+	void PortAudioDevice::PlaySFXSource(AlternativeAudio::IAudioSource * source) {
+		//push new audio source to playing sources
+		if (source == nullptr || source == NULL) return;
+
+		long long flags = source->GetFlags();
+
+		//knock out these flags as sfx dont use them
+		if ((flags & AlternativeAudio::eAF_Loop) == 1) flags = (flags & ~AlternativeAudio::eAF_Loop);
+		if ((flags & AlternativeAudio::eAF_PausedOnStart) == 1) flags = (flags & ~AlternativeAudio::eAF_PausedOnStart);
+
+		PlayingAudioSource *playingSource = new PlayingAudioSource();
+		playingSource->audioSource = source;
+		playingSource->startFrame = 0;
+		playingSource->currentFrame = 0;
+		playingSource->endFrame = source->GetFrameLength();
+		playingSource->loop = false;
+		playingSource->paused = false;
+		playingSource->flags.SetFlags(flags);
+
+		if (this->m_isQueue) {
+			m_queueCommands.push_back(new PlaySFXQueueCommand(playingSource, this));
+			return;
+		}
+
+		this->m_callbackMutex.lock();
+		this->m_playingSFXAudioSource.push_back(playingSource);
+		this->m_callbackMutex.unlock();
+
+		//check if stream is stopped, if it is, start it up.
+		if (Pa_IsStreamActive(this->m_pAudioStream) != 1 && !m_isAllPaused) {
+			if (Pa_IsStreamStopped(this->m_pAudioStream) != 1) Pa_StopStream(this->m_pAudioStream); //resets stream time.
+			Pa_StartStream(this->m_pAudioStream);
+		}
+	}
+
+	void PortAudioDevice::PauseSource(unsigned long long id) {
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new PauseQueueCommand(id, this));
 			return;
@@ -217,7 +253,7 @@ namespace PortAudio {
 		this->m_callbackMutex.unlock();
 	}
 
-	void PortAudioDevice::ResumeSource(long long id) {
+	void PortAudioDevice::ResumeSource(unsigned long long id) {
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new ResumeQueueCommand(id, this));
 			return;
@@ -232,13 +268,13 @@ namespace PortAudio {
 		this->m_callbackMutex.unlock();
 
 		//check if stream is stopped, if it is, start it up.
-		if (Pa_IsStreamActive(this->m_pAudioStream) != 1) {
-			Pa_StopStream(this->m_pAudioStream); //resets stream time.
+		if (Pa_IsStreamActive(this->m_pAudioStream) != 1 && !m_isAllPaused) {
+			if (Pa_IsStreamStopped(this->m_pAudioStream) != 1) Pa_StopStream(this->m_pAudioStream); //resets stream time.
 			Pa_StartStream(this->m_pAudioStream);
 		}
 	}
 
-	void PortAudioDevice::StopSource(long long id) {
+	void PortAudioDevice::StopSource(unsigned long long id) {
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new StopQueueCommand(id, this));
 			return;
@@ -249,7 +285,7 @@ namespace PortAudio {
 		this->m_callbackMutex.unlock();
 	}
 
-	bool PortAudioDevice::IsPlaying(long long id) {
+	bool PortAudioDevice::IsPlaying(unsigned long long id) {
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end()) {
 			bool paused = this->m_playingAudioSource[id]->paused;
@@ -261,7 +297,7 @@ namespace PortAudio {
 		return false;
 	}
 
-	AlternativeAudio::AudioSourceTime PortAudioDevice::GetTime(long long id) {
+	AlternativeAudio::AudioSourceTime PortAudioDevice::GetTime(unsigned long long id) {
 		long long currTime = 0;
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end()) currTime = this->m_playingAudioSource[id]->currentFrame;
@@ -276,7 +312,7 @@ namespace PortAudio {
 		return timeLength;
 	}
 
-	void PortAudioDevice::SetTime(long long id, double time) {
+	void PortAudioDevice::SetTime(unsigned long long id, double time) {
 		long long setFrame = (long long)(time * this->m_playingAudioSource[id]->audioSource->GetSampleRate());
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end()) {
@@ -284,6 +320,37 @@ namespace PortAudio {
 			if (setFrame > this->m_playingAudioSource[id]->endFrame) setFrame = this->m_playingAudioSource[id]->endFrame;
 			this->m_playingAudioSource[id]->currentFrame = setFrame;
 		}
+		this->m_callbackMutex.unlock();
+	}
+
+	void PortAudioDevice::PauseAll() {
+		if (Pa_IsStreamActive(this->m_pAudioStream) == 1 && !m_isAllPaused) {
+			this->m_callbackMutex.lock();
+			Pa_StopStream(this->m_pAudioStream);
+			this->m_callbackMutex.unlock();
+			m_isAllPaused = true;
+		}
+	}
+	void PortAudioDevice::ResumeAll() {
+		if (Pa_IsStreamActive(this->m_pAudioStream) != 1 && m_isAllPaused) {
+			this->m_callbackMutex.lock();
+			Pa_StartStream(this->m_pAudioStream);
+			this->m_callbackMutex.unlock();
+			m_isAllPaused = false;
+		}
+	}
+	void PortAudioDevice::StopAll() {
+		this->m_callbackMutex.lock();
+		m_isAllPaused = false;
+
+		//stop the stream
+		if (Pa_IsStreamActive(this->m_pAudioStream) == 1) Pa_StopStream(this->m_pAudioStream);
+		this->m_callbackMutex.unlock();
+
+		this->m_callbackMutex.lock();
+		//remove all sources
+		this->m_playingAudioSource.clear();
+		this->m_playingSFXAudioSource.clear();
 		this->m_callbackMutex.unlock();
 	}
 
@@ -339,7 +406,7 @@ namespace PortAudio {
 	}
 
 	int PortAudioDevice::paCallback(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData) {
-		if (this->m_playingAudioSource.size() == 0) {
+		if (this->m_playingAudioSource.size() == 0 && this->m_playingSFXAudioSource.size() == 0) {
 			//this->m_nextPlayID = 0;
 			return paComplete; //if we have no audio sources, why are we running?
 		}
@@ -359,70 +426,388 @@ namespace PortAudio {
 		bool allPaused = true;
 
 		this->m_callbackMutex.lock();
-		for (AZStd::pair<long long, PlayingAudioSource *> entry : this->m_playingAudioSource) {
-			if (entry.second->paused) continue; //if the audio file is paused, skip it.
-			allPaused = false;
+		//play audio sources
+		if (!this->m_playingAudioSource.empty()) {
+			//for (AZStd::pair<long long, PlayingAudioSource *> entry : this->m_playingAudioSource) {
+			auto it = this->m_playingAudioSource.begin();
+			while (it != this->m_playingAudioSource.end()) {
+				auto entry = (*it);
 
-			{ // clear the frames out buffer;
-				for (int i = 0; i < framesPerBuffer * pachannels; i++) ((float*)framesOut)[i] = 0.0f;
-			}
+				if (entry.second->paused) continue; //if the audio file is paused, skip it.
+				allPaused = false;
 
-			//get the playing audio source
-			PlayingAudioSource* playingsource = entry.second;
-			playingsource->audioSource->Seek(playingsource->currentFrame); //seek to the current position of the file
-			AlternativeAudio::AudioFrame::Type sourceFrameType = playingsource->audioSource->GetFrameType();
-			long long prevFlags = playingsource->flags.GetFlags();
+				{ // clear the frames out buffer;
+					for (int i = 0; i < framesPerBuffer * pachannels; i++) ((float*)framesOut)[i] = 0.0f;
+				}
 
-			//get the ratio of the sample rate conversion
-			double ratio = this->m_sampleRate / playingsource->audioSource->GetSampleRate();
+				//get the playing audio source
+				PlayingAudioSource* playingsource = entry.second;
+				playingsource->audioSource->Seek(playingsource->currentFrame); //seek to the current position of the file
+				AlternativeAudio::AudioFrame::Type sourceFrameType = playingsource->audioSource->GetFrameType();
+				long long prevFlags = playingsource->flags.GetFlags();
 
-			long long frameLength = 0;
+				//get the ratio of the sample rate conversion
+				double ratio = this->m_sampleRate / playingsource->audioSource->GetSampleRate();
 
-			//convert to port audio's audio frame format and resample.
-			if (ratio == 1.0f || !src_is_valid_ratio(ratio)) { //if the sample rate is the same between the audio source and port audio or if it's not a valid ratio.
-				AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesPerBuffer); //create a buffer to hold the audio sources data
+				long long frameLength = 0;
 
-				frameLength = playingsource->audioSource->GetFrames(framesPerBuffer, (float *)srcframes); //get the data.
-				playingsource->currentFrame += frameLength;
+				//convert to port audio's audio frame format and resample.
+				if (ratio == 1.0f || !src_is_valid_ratio(ratio)) { //if the sample rate is the same between the audio source and port audio or if it's not a valid ratio.
+					AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesPerBuffer); //create a buffer to hold the audio sources data
 
-				//apply before convert dsp
+					frameLength = playingsource->audioSource->GetFrames(framesPerBuffer, (float *)srcframes); //get the data.
+					playingsource->currentFrame += frameLength;
+
+					//apply before convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+
+					//convert the audio source's number of channels to port audio's number of channels.
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioRequestBus,
+						ConvertAudioFrame,
+						srcframes,
+						framesOut,
+						sourceFrameType,
+						this->m_audioFormat,
+						frameLength
+					);
+					delete[] srcframes; //free up the memory.
+
+					//apply after convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)framesOut,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)framesOut,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+				} else { //otherwise
+					//read frame data.
+					long long framesToRead = (((long long)((double)framesPerBuffer / ratio)));
+					AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesToRead);
+					long long framesRead = playingsource->audioSource->GetFrames(framesToRead, (float *)srcframes); //get the data.
+
+					//convert to port audio's channels.
+					AlternativeAudio::AudioFrame::Frame * convertedSrcFrames = PortAudioDevice::CreateBuffer(this->m_audioFormat, framesToRead);
+
+					//apply before convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+
+					//convert the audio source's number of channels to port audio's number of channels.
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioRequestBus,
+						ConvertAudioFrame,
+						srcframes,
+						convertedSrcFrames,
+						sourceFrameType,
+						this->m_audioFormat,
+						framesRead
+					);
+					delete[] srcframes;
+
+					//apply after convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)convertedSrcFrames,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)convertedSrcFrames,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+
+					//convert samplerate.
+					SRC_DATA src_data;
+					src_data.data_in = (float *)convertedSrcFrames;
+					src_data.data_out = (float *)framesOut;
+					src_data.input_frames = (long)framesRead;
+					src_data.output_frames = framesPerBuffer;
+					src_data.src_ratio = ratio;
+
+					//tell the sample rate converter if we are at the end or not.
+					src_data.end_of_input = (playingsource->currentFrame + src_data.input_frames >= playingsource->endFrame);
+
+					//reset the sample rate conversion state
+					src_reset(this->m_pSrcState);
+
+					//convert the sample rate
+					int src_err = src_process(this->m_pSrcState, &src_data);
+
+					if (src_err != 0) this->pushError(src_err, src_strerror(src_err)); //if we have an error, push it back.
+
+					delete[] convertedSrcFrames; //free up the frame in buffer
+
+					frameLength = src_data.output_frames_gen;
+					playingsource->currentFrame += src_data.input_frames_used;
+				}
+
+				//apply after resampling dsp
 				if (m_isMaster)
 					EBUS_EVENT(
 						AlternativeAudio::AlternativeAudioDSPBus,
 						ProcessEffects,
-						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
-						sourceFrameType,
-						(float*)srcframes,
+						AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
+						this->m_audioFormat,
+						(float*)framesOut,
 						framesPerBuffer,
 						&playingsource->flags
 					);
 				else
 					this->ProcessEffects(
-						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
-						sourceFrameType,
-						(float*)srcframes,
+						AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
+						this->m_audioFormat,
+						(float*)framesOut,
 						framesPerBuffer,
 						&playingsource->flags
 					);
 
-				//convert the audio source's number of channels to port audio's number of channels.
+				playingsource->flags.SetFlags(prevFlags);
+
+				//mix audio
 				EBUS_EVENT(
 					AlternativeAudio::AlternativeAudioRequestBus,
-					ConvertAudioFrame,
-					srcframes,
-					framesOut,
-					sourceFrameType,
+					MixAudioFrames,
+					(float*)outputBuffer,
+					(float*)framesOut,
 					this->m_audioFormat,
 					frameLength
 				);
-				delete[] srcframes; //free up the memory.
 
-				//apply after convert dsp
+				if (playingsource->currentFrame >= playingsource->endFrame) { //if we are finished playing.
+					if (playingsource->loop) { //if we are to loop
+						playingsource->currentFrame = playingsource->startFrame; //set the current frame to the beginning.
+					} else { //otherwise
+						//m_stoppedAudioFiles.push_back(entry.first); //mark for removal.
+						it = this->m_playingAudioSource.erase(it);
+					}
+				}
+			}
+		}
+
+		//play sfx sources
+		if (!this->m_playingSFXAudioSource.empty()) {
+			allPaused = false;
+			auto it2 = this->m_playingSFXAudioSource.begin();
+			while (it2 != this->m_playingSFXAudioSource.end()) {
+				{ // clear the frames out buffer;
+					for (int i = 0; i < framesPerBuffer * pachannels; i++) ((float*)framesOut)[i] = 0.0f;
+				}
+
+				//get the playing audio source
+				PlayingAudioSource * playingsource = (*it2);
+				playingsource->audioSource->Seek(playingsource->currentFrame); //seek to the current position of the file
+				AlternativeAudio::AudioFrame::Type sourceFrameType = playingsource->audioSource->GetFrameType();
+				long long prevFlags = playingsource->flags.GetFlags();
+
+				//get the ratio of the sample rate conversion
+				double ratio = this->m_sampleRate / playingsource->audioSource->GetSampleRate();
+
+				long long frameLength = 0;
+
+				//convert to port audio's audio frame format and resample.
+				if (ratio == 1.0f || !src_is_valid_ratio(ratio)) { //if the sample rate is the same between the audio source and port audio or if it's not a valid ratio.
+					AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesPerBuffer); //create a buffer to hold the audio sources data
+
+					frameLength = playingsource->audioSource->GetFrames(framesPerBuffer, (float *)srcframes); //get the data.
+					playingsource->currentFrame += frameLength;
+
+					//apply before convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+
+					//convert the audio source's number of channels to port audio's number of channels.
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioRequestBus,
+						ConvertAudioFrame,
+						srcframes,
+						framesOut,
+						sourceFrameType,
+						this->m_audioFormat,
+						frameLength
+					);
+					delete[] srcframes; //free up the memory.
+
+										//apply after convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)framesOut,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)framesOut,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+				} else { //otherwise
+						 //read frame data.
+					long long framesToRead = (((long long)((double)framesPerBuffer / ratio)));
+					AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesToRead);
+					long long framesRead = playingsource->audioSource->GetFrames(framesToRead, (float *)srcframes); //get the data.
+
+																													//convert to port audio's channels.
+					AlternativeAudio::AudioFrame::Frame * convertedSrcFrames = PortAudioDevice::CreateBuffer(this->m_audioFormat, framesToRead);
+
+					//apply before convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_BC,
+							sourceFrameType,
+							(float*)srcframes,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+
+					//convert the audio source's number of channels to port audio's number of channels.
+					EBUS_EVENT(
+						AlternativeAudio::AlternativeAudioRequestBus,
+						ConvertAudioFrame,
+						srcframes,
+						convertedSrcFrames,
+						sourceFrameType,
+						this->m_audioFormat,
+						framesRead
+					);
+					delete[] srcframes;
+
+					//apply after convert dsp
+					if (m_isMaster)
+						EBUS_EVENT(
+							AlternativeAudio::AlternativeAudioDSPBus,
+							ProcessEffects,
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)convertedSrcFrames,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+					else
+						this->ProcessEffects(
+							AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+							this->m_audioFormat,
+							(float*)convertedSrcFrames,
+							framesPerBuffer,
+							&playingsource->flags
+						);
+
+					//convert samplerate.
+					SRC_DATA src_data;
+					src_data.data_in = (float *)convertedSrcFrames;
+					src_data.data_out = (float *)framesOut;
+					src_data.input_frames = (long)framesRead;
+					src_data.output_frames = framesPerBuffer;
+					src_data.src_ratio = ratio;
+
+					//tell the sample rate converter if we are at the end or not.
+					src_data.end_of_input = (playingsource->currentFrame + src_data.input_frames >= playingsource->endFrame);
+
+					//reset the sample rate conversion state
+					src_reset(this->m_pSrcState);
+
+					//convert the sample rate
+					int src_err = src_process(this->m_pSrcState, &src_data);
+
+					if (src_err != 0) this->pushError(src_err, src_strerror(src_err)); //if we have an error, push it back.
+
+					delete[] convertedSrcFrames; //free up the frame in buffer
+
+					frameLength = src_data.output_frames_gen;
+					playingsource->currentFrame += src_data.input_frames_used;
+				}
+
+				//apply after resampling dsp
 				if (m_isMaster)
 					EBUS_EVENT(
 						AlternativeAudio::AlternativeAudioDSPBus,
 						ProcessEffects,
-						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+						AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
 						this->m_audioFormat,
 						(float*)framesOut,
 						framesPerBuffer,
@@ -430,135 +815,30 @@ namespace PortAudio {
 					);
 				else
 					this->ProcessEffects(
-						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
+						AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
 						this->m_audioFormat,
 						(float*)framesOut,
 						framesPerBuffer,
 						&playingsource->flags
 					);
-			} else { //otherwise
-				//read frame data.
-				long long framesToRead = (((long long)((double)framesPerBuffer / ratio)));
-				AlternativeAudio::AudioFrame::Frame * srcframes = PortAudioDevice::CreateBuffer(sourceFrameType, framesToRead);
-				long long framesRead = playingsource->audioSource->GetFrames(framesToRead, (float *)srcframes); //get the data.
 
-				//convert to port audio's channels.
-				AlternativeAudio::AudioFrame::Frame * convertedSrcFrames = PortAudioDevice::CreateBuffer(this->m_audioFormat, framesToRead);
+				playingsource->flags.SetFlags(prevFlags);
 
-				//apply before convert dsp
-				if (m_isMaster)
-					EBUS_EVENT(
-						AlternativeAudio::AlternativeAudioDSPBus,
-						ProcessEffects,
-						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
-						sourceFrameType,
-						(float*)srcframes,
-						framesPerBuffer,
-						&playingsource->flags
-					);
-				else
-					this->ProcessEffects(
-						AlternativeAudio::AADSPSection::eDS_PerSource_BC,
-						sourceFrameType,
-						(float*)srcframes,
-						framesPerBuffer,
-						&playingsource->flags
-					);
-
-				//convert the audio source's number of channels to port audio's number of channels.
+				//mix audio
 				EBUS_EVENT(
 					AlternativeAudio::AlternativeAudioRequestBus,
-					ConvertAudioFrame,
-					srcframes,
-					convertedSrcFrames,
-					sourceFrameType,
-					this->m_audioFormat,
-					framesRead
-				);
-				delete[] srcframes;
-
-				//apply after convert dsp
-				if (m_isMaster)
-					EBUS_EVENT(
-						AlternativeAudio::AlternativeAudioDSPBus,
-						ProcessEffects,
-						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
-						this->m_audioFormat,
-						(float*)convertedSrcFrames,
-						framesPerBuffer,
-						&playingsource->flags
-					);
-				else
-					this->ProcessEffects(
-						AlternativeAudio::AADSPSection::eDS_PerSource_AC,
-						this->m_audioFormat,
-						(float*)convertedSrcFrames,
-						framesPerBuffer,
-						&playingsource->flags
-					);
-
-				//convert samplerate.
-				SRC_DATA src_data;
-				src_data.data_in = (float *)convertedSrcFrames;
-				src_data.data_out = (float *)framesOut;
-				src_data.input_frames = (long)framesRead;
-				src_data.output_frames = framesPerBuffer;
-				src_data.src_ratio = ratio;
-
-				//tell the sample rate converter if we are at the end or not.
-				src_data.end_of_input = (playingsource->currentFrame + src_data.input_frames >= playingsource->endFrame);
-
-				//reset the sample rate conversion state
-				src_reset(this->m_pSrcState);
-
-				//convert the sample rate
-				int src_err = src_process(this->m_pSrcState, &src_data);
-
-				if (src_err != 0) this->pushError(src_err, src_strerror(src_err)); //if we have an error, push it back.
-
-				delete[] convertedSrcFrames; //free up the frame in buffer
-
-				frameLength = src_data.output_frames_gen;
-				playingsource->currentFrame += src_data.input_frames_used;
-			}
-
-			//apply after resampling dsp
-			if (m_isMaster)
-				EBUS_EVENT(
-					AlternativeAudio::AlternativeAudioDSPBus,
-					ProcessEffects,
-					AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
-					this->m_audioFormat,
+					MixAudioFrames,
+					(float*)outputBuffer,
 					(float*)framesOut,
-					framesPerBuffer,
-					&playingsource->flags
-				);
-			else
-				this->ProcessEffects(
-					AlternativeAudio::AADSPSection::eDS_PerSource_ARS,
 					this->m_audioFormat,
-					(float*)framesOut,
-					framesPerBuffer,
-					&playingsource->flags
+					frameLength
 				);
 
-			playingsource->flags.SetFlags(prevFlags);
-
-			//mix audio
-			EBUS_EVENT(
-				AlternativeAudio::AlternativeAudioRequestBus,
-				MixAudioFrames,
-				(float*)outputBuffer,
-				(float*)framesOut,
-				this->m_audioFormat,
-				frameLength
-			);
-
-			if (playingsource->currentFrame >= playingsource->endFrame) { //if we are finished playing.
-				if (playingsource->loop) { //if we are to loop
-					playingsource->currentFrame = playingsource->startFrame; //set the current frame to the beginning.
-				} else { //otherwise
-					m_stoppedAudioFiles.push_back(entry.first); //mark for removal.
+				if (playingsource->currentFrame >= playingsource->endFrame) { //if we are finished playing.
+					//remove it.
+					it2 = this->m_playingSFXAudioSource.erase(it2); //erase will return an iterator to the next entry.
+				} else { //otherwise, on to the next source.
+					++it2;
 				}
 			}
 		}
@@ -588,10 +868,10 @@ namespace PortAudio {
 		this->m_flags.SetFlags(dflags);
 
 		//removed stopped audio files.
-		while (m_stoppedAudioFiles.size() > 0) {
+		/*while (m_stoppedAudioFiles.size() > 0) {
 			this->m_playingAudioSource.erase(m_stoppedAudioFiles.back());
 			m_stoppedAudioFiles.pop_back();
-		}
+		}*/
 		this->m_callbackMutex.unlock();
 
 		if (allPaused) return paComplete; //if all the sources are paused, why are we running?
@@ -650,6 +930,9 @@ namespace PortAudio {
 	//-----------------------------
 	void PortAudioDevice::PlayQueueCommand::Execute() {
 		m_pad->m_playingAudioSource.insert(AZStd::make_pair<>(m_uID, m_pasrc));
+	}
+	void PortAudioDevice::PlaySFXQueueCommand::Execute() {
+		m_pad->m_playingSFXAudioSource.push_back(m_pasrc);
 	}
 	void PortAudioDevice::PauseQueueCommand::Execute() {
 		if (m_pad->m_playingAudioSource.find(m_uID) == m_pad->m_playingAudioSource.end()) return;

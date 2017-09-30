@@ -2,16 +2,16 @@
 
 #include <AzCore/Component/Component.h>
 
-#include <PortAudio/PortAudioBus.h>
 #include "PortAudioInternalBus.h"
 
 #include "PortAudioCommon.h"
+
+#include <AlternativeAudio\Device\OAudioDevice.h>
 
 namespace PortAudio
 {
     class PortAudioSystemComponent
         : public AZ::Component
-        , protected PortAudioRequestBus::Handler
 		, protected PortAudioInternalNotificationsBus::Handler
 		, public AlternativeAudio::OAudioDeviceProvider
     {
