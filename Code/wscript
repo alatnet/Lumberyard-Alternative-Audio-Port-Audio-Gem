@@ -56,4 +56,5 @@ def build(bld):
         release_libpath = [
             bld.path.abspath() + '/../3rdParty/portaudio/lib/Release'
         ],
+        win_features = ['crcfix']
     )

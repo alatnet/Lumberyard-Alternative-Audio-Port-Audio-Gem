@@ -1,20 +1,20 @@
 {
-  "Dependencies": [
-    {
-      "Uuid": "b4745a69bade49a3aacc01e4475bdee7",
-      "VersionConstraints": [
-        "~>0.1"
-      ],
-      "_comment": "AlternativeAudio"
-    }
-  ],
-    "GemFormatVersion": 3,
-    "Uuid": "96a96b530fa24e0ba3a51daa485e9b16",
-    "Name": "PortAudio",
-    "DisplayName": "PortAudio",
-    "Version": "0.1.0",
-    "LinkType": "Dynamic",
-    "Summary": "Port Audio Gem to add in simple audio system.",
-    "Tags": ["Audio", "Alternative Audio"],
-    "IconPath": "preview.png"
+	"Dependencies": [
+		{
+			"Uuid": "b4745a69bade49a3aacc01e4475bdee7",
+			"VersionConstraints": [
+				">=3.1"
+			],
+			"_comment": "AlternativeAudio"
+		}
+	],
+	"GemFormatVersion": 3,
+	"Uuid": "96a96b530fa24e0ba3a51daa485e9b16",
+	"Name": "PortAudio",
+	"DisplayName": "PortAudio",
+	"Version": "3.1.0",
+	"LinkType": "Dynamic",
+	"Summary": "Port Audio Gem to add in simple audio system.",
+	"Tags": ["Audio", "Alternative Audio"],
+	"IconPath": "preview.png"
 }
