@@ -10,6 +10,8 @@
 
 #include <AlternativeAudio\AlternativeAudioBus.h>
 
+#include <PortAudio\PortAudioUserData.h>
+
 namespace PortAudio {
 	int PortAudioSystemComponent::m_initializeCount = 0;
 	bool PortAudioSystemComponent::m_initialized = false;
@@ -60,6 +62,8 @@ namespace PortAudio {
 				->Version(0)
 				->SerializerForEmptyClass();
 
+			PortAudioUserData::Reflect(serialize);
+
 			if (AZ::EditContext* ec = serialize->GetEditContext()) {
 				ec->Class<PortAudioSystemComponent>("PortAudio", "Port Audio playback system utilizing Alternative Audio Gem.")
 					->ClassElement(AZ::Edit::ClassElements::EditorData, "")
@@ -68,6 +72,18 @@ namespace PortAudio {
 					->Attribute(AZ::Edit::Attributes::AutoExpand, true)
 					;
 			}
+		}
+
+		AZ::BehaviorContext* behaviorContext = azrtti_cast<AZ::BehaviorContext*>(context);
+		if (behaviorContext) {
+			PortAudioUserData::Behavior(behaviorContext);
+
+			behaviorContext->Class<PortAudioSystemComponent>("PortAudio")
+				->Attribute(AZ::Script::Attributes::Category, "PortAudio")
+				->Constant("NoFlag", []() -> PaStreamFlags { return paNoFlag; })
+				->Constant("ClipOff", []() -> PaStreamFlags { return paClipOff; })
+				->Constant("DitherOff", []() -> PaStreamFlags { return paDitherOff; })
+				;
 		}
 	}
 

@@ -12,7 +12,7 @@
 	"Uuid": "96a96b530fa24e0ba3a51daa485e9b16",
 	"Name": "PortAudio",
 	"DisplayName": "PortAudio",
-	"Version": "3.1.0",
+	"Version": "3.2.0",
 	"LinkType": "Dynamic",
 	"Summary": "Port Audio Gem to add in simple audio system.",
 	"Tags": ["Audio", "Alternative Audio"],

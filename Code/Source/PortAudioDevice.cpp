@@ -630,10 +630,13 @@ namespace PortAudio {
 				if (playingsource->currentFrame >= playingsource->endFrame) { //if we are finished playing.
 					if (playingsource->loop) { //if we are to loop
 						playingsource->currentFrame = playingsource->startFrame; //set the current frame to the beginning.
+						++it;
 					} else { //otherwise
 						//m_stoppedAudioFiles.push_back(entry.first); //mark for removal.
 						it = this->m_playingAudioSource.erase(it);
 					}
+				} else {
+					++it;
 				}
 			}
 		}
