@@ -25,6 +25,9 @@ namespace PortAudio {
 		AlternativeAudio::AudioSourceTime GetTime(unsigned long long id);
 		void SetTime(unsigned long long id, double time);
 	public:
+		void UpdateAttribute(unsigned long long id, AZ::Crc32 idCrc, AlternativeAudio::AAAttribute* attr);
+		void ClearAttribute(unsigned long long id, AZ::Crc32 idCrc);
+	public:
 		void PauseAll();
 		void ResumeAll();
 		void StopAll();
@@ -56,7 +59,7 @@ namespace PortAudio {
 			bool loop{ false };
 			bool paused{ false };
 			float vol{ 1.0f };
-			AlternativeAudio::AAFlagHandler flags;
+			AlternativeAudio::AAAttributeHandler attributes;
 		};
 	private:
 		typedef AZStd::unordered_map<unsigned long long, PlayingAudioSource *> PlayingAudioSourcesMap;

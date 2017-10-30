@@ -3,6 +3,7 @@
 #include <PortAudioDevice.h>
 #include <PortAudio\PortAudioUserData.h>
 #include <AlternativeAudio\AlternativeAudioBus.h>
+#include <AlternativeAudio\AAAttributeTypes.h>
 #include "PortAudioInternalBus.h"
 
 namespace PortAudio {
@@ -174,16 +175,26 @@ namespace PortAudio {
 
 		long long uID = this->m_nextPlayID++;
 
-		long long flags = source->GetFlags();
-
 		PlayingAudioSource *playingSource = new PlayingAudioSource();
 		playingSource->audioSource = source;
 		playingSource->startFrame = 0;
 		playingSource->currentFrame = 0;
 		playingSource->endFrame = source->GetFrameLength();
-		playingSource->loop = ((flags & AlternativeAudio::eAF_Loop) == 1);
-		playingSource->paused = ((flags & AlternativeAudio::eAF_PausedOnStart) == 1);
-		playingSource->flags.SetFlags(flags);
+
+		if (source->hasAttr(AlternativeAudio::Attributes::Source::Loop)) {
+			AZ::AttributeData<bool>* loop = (AZ::AttributeData<bool>*)source->getAttr(AlternativeAudio::Attributes::Source::Loop);
+			playingSource->loop = loop->Get(nullptr);
+		} else {
+			playingSource->loop = false;
+		}
+
+		if (source->hasAttr(AlternativeAudio::Attributes::Source::PausedOnStart)) {
+			AZ::AttributeData<bool>* paused = (AZ::AttributeData<bool>*)source->getAttr(AlternativeAudio::Attributes::Source::PausedOnStart);
+			playingSource->paused = paused->Get(nullptr);
+		} else {
+			playingSource->paused = false;
+		}
+		playingSource->attributes = (AlternativeAudio::AAAttributeHandler)(*source);
 		
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new PlayQueueCommand(uID, playingSource, this));
@@ -202,16 +213,9 @@ namespace PortAudio {
 
 		return uID;
 	}
-
 	void PortAudioDevice::PlaySFXSource(AlternativeAudio::IAudioSource * source) {
 		//push new audio source to playing sources
 		if (source == nullptr || source == NULL) return;
-
-		long long flags = source->GetFlags();
-
-		//knock out these flags as sfx dont use them
-		if ((flags & AlternativeAudio::eAF_Loop) == 1) flags = (flags & ~AlternativeAudio::eAF_Loop);
-		if ((flags & AlternativeAudio::eAF_PausedOnStart) == 1) flags = (flags & ~AlternativeAudio::eAF_PausedOnStart);
 
 		PlayingAudioSource *playingSource = new PlayingAudioSource();
 		playingSource->audioSource = source;
@@ -220,7 +224,13 @@ namespace PortAudio {
 		playingSource->endFrame = source->GetFrameLength();
 		playingSource->loop = false;
 		playingSource->paused = false;
-		playingSource->flags.SetFlags(flags);
+		playingSource->attributes = (AlternativeAudio::AAAttributeHandler)(*source);
+
+		if (playingSource->attributes.hasAttr(AlternativeAudio::Attributes::Source::Loop))
+			playingSource->attributes.unsetAttr(AlternativeAudio::Attributes::Source::Loop);
+
+		if (playingSource->attributes.hasAttr(AlternativeAudio::Attributes::Source::PausedOnStart))
+			playingSource->attributes.unsetAttr(AlternativeAudio::Attributes::Source::Loop);
 
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new PlaySFXQueueCommand(playingSource, this));
@@ -237,7 +247,6 @@ namespace PortAudio {
 			Pa_StartStream(this->m_pAudioStream);
 		}
 	}
-
 	void PortAudioDevice::PauseSource(unsigned long long id) {
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new PauseQueueCommand(id, this));
@@ -252,7 +261,6 @@ namespace PortAudio {
 		this->m_playingAudioSource[id]->paused = true;
 		this->m_callbackMutex.unlock();
 	}
-
 	void PortAudioDevice::ResumeSource(unsigned long long id) {
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new ResumeQueueCommand(id, this));
@@ -273,7 +281,6 @@ namespace PortAudio {
 			Pa_StartStream(this->m_pAudioStream);
 		}
 	}
-
 	void PortAudioDevice::StopSource(unsigned long long id) {
 		if (this->m_isQueue) {
 			m_queueCommands.push_back(new StopQueueCommand(id, this));
@@ -284,7 +291,6 @@ namespace PortAudio {
 		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end()) this->m_playingAudioSource.erase(id);
 		this->m_callbackMutex.unlock();
 	}
-
 	bool PortAudioDevice::IsPlaying(unsigned long long id) {
 		this->m_callbackMutex.lock();
 		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end()) {
@@ -311,7 +317,6 @@ namespace PortAudio {
 
 		return timeLength;
 	}
-
 	void PortAudioDevice::SetTime(unsigned long long id, double time) {
 		long long setFrame = (long long)(time * this->m_playingAudioSource[id]->audioSource->GetSampleRate());
 		this->m_callbackMutex.lock();
@@ -321,6 +326,15 @@ namespace PortAudio {
 			this->m_playingAudioSource[id]->currentFrame = setFrame;
 		}
 		this->m_callbackMutex.unlock();
+	}
+
+	void PortAudioDevice::UpdateAttribute(unsigned long long id, AZ::Crc32 idCrc, AlternativeAudio::AAAttribute* attr) {
+		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end())
+			this->m_playingAudioSource[id]->attributes.setAttr(idCrc, attr);
+	}
+	void PortAudioDevice::ClearAttribute(unsigned long long id, AZ::Crc32 idCrc) {
+		if (this->m_playingAudioSource.find(id) != this->m_playingAudioSource.end())
+			this->m_playingAudioSource[id]->attributes.unsetAttr(idCrc);
 	}
 
 	void PortAudioDevice::PauseAll() {
@@ -411,7 +425,7 @@ namespace PortAudio {
 			return paComplete; //if we have no audio sources, why are we running?
 		}
 
-		long long dflags = this->m_flags.GetFlags();
+		AlternativeAudio::AAAttributeHandler dattr(this->m_attributes);
 
 		int pachannels = PortAudioDevice::getNumberOfChannels(this->m_audioFormat);
 
@@ -444,7 +458,8 @@ namespace PortAudio {
 				PlayingAudioSource* playingsource = entry.second;
 				playingsource->audioSource->Seek(playingsource->currentFrame); //seek to the current position of the file
 				AlternativeAudio::AudioFrame::Type sourceFrameType = playingsource->audioSource->GetFrameType();
-				long long prevFlags = playingsource->flags.GetFlags();
+
+				AlternativeAudio::AAAttributeHandler prevAttr(playingsource->attributes);
 
 				//get the ratio of the sample rate conversion
 				double ratio = this->m_sampleRate / playingsource->audioSource->GetSampleRate();
@@ -467,7 +482,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -475,7 +490,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 
 					//convert the audio source's number of channels to port audio's number of channels.
@@ -499,7 +514,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)framesOut,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -507,7 +522,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)framesOut,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 				} else { //otherwise
 					//read frame data.
@@ -527,7 +542,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -535,7 +550,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 
 					//convert the audio source's number of channels to port audio's number of channels.
@@ -559,7 +574,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)convertedSrcFrames,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -567,7 +582,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)convertedSrcFrames,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 
 					//convert samplerate.
@@ -604,7 +619,7 @@ namespace PortAudio {
 						this->m_audioFormat,
 						(float*)framesOut,
 						framesPerBuffer,
-						&playingsource->flags
+						&playingsource->attributes
 					);
 				else
 					this->ProcessEffects(
@@ -612,10 +627,10 @@ namespace PortAudio {
 						this->m_audioFormat,
 						(float*)framesOut,
 						framesPerBuffer,
-						&playingsource->flags
+						&playingsource->attributes
 					);
 
-				playingsource->flags.SetFlags(prevFlags);
+				playingsource->attributes = prevAttr;
 
 				//mix audio
 				EBUS_EVENT(
@@ -654,7 +669,7 @@ namespace PortAudio {
 				PlayingAudioSource * playingsource = (*it2);
 				playingsource->audioSource->Seek(playingsource->currentFrame); //seek to the current position of the file
 				AlternativeAudio::AudioFrame::Type sourceFrameType = playingsource->audioSource->GetFrameType();
-				long long prevFlags = playingsource->flags.GetFlags();
+				AlternativeAudio::AAAttributeHandler prevAttr(playingsource->attributes);
 
 				//get the ratio of the sample rate conversion
 				double ratio = this->m_sampleRate / playingsource->audioSource->GetSampleRate();
@@ -677,7 +692,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -685,7 +700,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 
 					//convert the audio source's number of channels to port audio's number of channels.
@@ -709,7 +724,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)framesOut,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -717,7 +732,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)framesOut,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 				} else { //otherwise
 						 //read frame data.
@@ -737,7 +752,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -745,7 +760,7 @@ namespace PortAudio {
 							sourceFrameType,
 							(float*)srcframes,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 
 					//convert the audio source's number of channels to port audio's number of channels.
@@ -769,7 +784,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)convertedSrcFrames,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 					else
 						this->ProcessEffects(
@@ -777,7 +792,7 @@ namespace PortAudio {
 							this->m_audioFormat,
 							(float*)convertedSrcFrames,
 							framesPerBuffer,
-							&playingsource->flags
+							&playingsource->attributes
 						);
 
 					//convert samplerate.
@@ -814,7 +829,7 @@ namespace PortAudio {
 						this->m_audioFormat,
 						(float*)framesOut,
 						framesPerBuffer,
-						&playingsource->flags
+						&playingsource->attributes
 					);
 				else
 					this->ProcessEffects(
@@ -822,10 +837,10 @@ namespace PortAudio {
 						this->m_audioFormat,
 						(float*)framesOut,
 						framesPerBuffer,
-						&playingsource->flags
+						&playingsource->attributes
 					);
 
-				playingsource->flags.SetFlags(prevFlags);
+				playingsource->attributes = prevAttr;
 
 				//mix audio
 				EBUS_EVENT(
@@ -857,7 +872,7 @@ namespace PortAudio {
 				this->m_audioFormat,
 				(float*)outputBuffer,
 				framesPerBuffer,
-				&this->m_flags
+				&this->m_attributes
 			);
 		else
 			this->ProcessEffects(
@@ -865,10 +880,10 @@ namespace PortAudio {
 				this->m_audioFormat,
 				(float*)outputBuffer,
 				framesPerBuffer,
-				&this->m_flags
+				&this->m_attributes
 			);
 
-		this->m_flags.SetFlags(dflags);
+		this->m_attributes = dattr;
 
 		//removed stopped audio files.
 		/*while (m_stoppedAudioFiles.size() > 0) {
